@@ -299,7 +299,7 @@ body.cb .r-Set{color:#6ea8ff}body.cb .r-Ancient{color:#ff9a3a}
 /* =====================================================================
    DARK REALMS: ETERNAL DESCENT — continuation of the user's prototype.
    Preserved from the prototype: 5 classes, isometric Blood Moor arena,
-   automatic nearest-enemy attacks, WASD + Shift + Space dash, I inventory,
+   automatic nearest-enemy attacks, WASD + Space dash, I inventory,
    Esc pause, Skeleton/Zombie/Fallen/Wraith/Demon waves, Dread Knight boss
    at 150s, XP gems, 3-choice level-ups, Magic/Rare/Legendary loot,
    localStorage inventory.
@@ -331,7 +331,7 @@ function loadValidated(k,def,isValid){
 const isArr=v=>Array.isArray(v),isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v),isNum=v=>typeof v==='number'&&isFinite(v);
 function collectSaveData(){const out={_saveVersion:SAVE_VERSION,_gameVersion:(typeof GAME_VERSION!=='undefined'?GAME_VERSION:'')};['dr2_meta','dr2_records','dr2_uid','dr2_speed'].forEach(k=>{try{const raw=localStorage.getItem(k);if(raw!=null)out[k]=JSON.parse(raw)}catch(e){}});return out}
 /* ---- Report a Bug: version stamp + recent-error capture (no personal data) ---- */
-const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v138 (2026-11-11). v138 FULL VS PARITY (Option E) — the horde can catch you now: all trash speeds re-based to 0.85-1.25x the slowest hero, instant velocity + locked camera, mixed waves instead of one-type blobs, per-enemy knockback resistance, off-screen spawns on any display, ranged made rare, dash cooldown 2s -> 3s. No balance numbers changed (damage/HP/XP untouched); the game gets harder because the horde closes, not because the numbers grew.";
+const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v139 (2026-11-11). v139 SPRINT REMOVED — Shift / full-tilt-joystick x1.3 run is gone; full tilt now moves at base speed, closing the last v138 parity escape valve. No balance numbers changed.";
 const BUG_ERRORS=[];
 function bugNoteError(msg){try{const s=String(msg==null?'Unknown error':msg).slice(0,300);BUG_ERRORS.push(new Date().toISOString()+' — '+s);if(BUG_ERRORS.length>10)BUG_ERRORS.shift()}catch(e){}}
 try{addEventListener('error',e=>{bugNoteError((e&&e.message)||'Script error')});addEventListener('unhandledrejection',e=>{const r=e&&e.reason;bugNoteError('Unhandled promise rejection: '+((r&&r.message)||r||'unknown'))})}catch(e){}
@@ -3409,7 +3409,7 @@ function menu(){state='menu';if(!goldRunLive){gold=0;runBonusGold=0} /* v92: no 
  ${menuShowProg?metaShopHTML():''}
  <div class="secHead">More</div>
  <div class="row"><button id="mGal" type="button">Sprite Gallery</button><button id="mSave" type="button">Save Export / Import</button><button id="mSettings" type="button">Settings</button><button id="mBug" class="bugBtn" type="button" data-bug-report>Report a Bug</button><button id="mNewGame" class="newGameBtn" type="button">New Game — Wipe All Progress</button></div>
- <p class="small">Controls: WASD / arrows move · Shift run · Space dash · Q potion · I build · C codex · Esc pause.</p>`);
+ <p class="small">Controls: WASD / arrows move · Space dash · Q potion · I build · C codex · Esc pause.</p>`);
  ui('mMode').onchange=e=>{mode=e.target.value}; /* v93: Endless Dungeon is FREE for everyone — no lock gate here any more */ ui('mDiff').onchange=e=>{if(e.target.value==='nightmare'&&!((meta.unlocks&&meta.unlocks.deep>=1)||meta.normalBossKills>0)){e.target.value=difficulty;menuShowProg=true;menu();showToast('Nightmare is locked — fell the Dread Knight on Normal once to open it');return}difficulty=e.target.value;const _hw=ui('mHellWarn');if(_hw)_hw.style.display=difficulty==='hell'?'block':'none';if(difficulty==='nightmare'){showToast('Nightmare: foe health ramps ×1.28 → ×1.45 and damage ×1.13 → ×1.33 over the first three depths');toastTimer=6}if(difficulty==='hell'){showToast('HELL: its first boss is a fresh-kit wall — clear Normal or Nightmare first. Health and damage both ramp in over the early depths');toastTimer=7}}; /* v93: Hell difficulty is FREE for everyone — its lock gate is gone. Nightmare keeps its EXACT old rule (owned Descent unlock rank 1+, read from meta.unlocks directly because PE.deep is now floored at 2 for the free Endless / Hell, OR one Normal Dread Knight kill) */ui('mZone').onchange=e=>zoneIdx=+e.target.value;
  const mc=ui('mChal');if(mc)mc.onchange=e=>{challenge=e.target.value;meta.challenge=challenge;saveAll()};
  const mcx=ui('mCodex');if(mcx)mcx.onclick=()=>codexUI('menu');
@@ -3514,7 +3514,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
  else if(aiOn){dx=aiVec.x;dy=aiVec.y}
  const len=Math.hypot(dx,dy)||1;const mag=Math.min(1,Math.hypot(dx,dy));if((dx||dy)&&(Math.abs(dx)>.01||Math.abs(dy)>.01))p.moveAng=Math.atan2(dy,dx); /* v130: the hero's FACING (last movement angle, world axes) - the Gravebow fires along it; defaults to 0 (right) until the hero first moves */
  const _phz=hazardAt(p.x,p.y); /* standing in lava / void / poison / on ice — checked once per step */
- const spd=p.speed*(p.class==='Amazon'&&!enemies.some(e=>!e.dead&&Math.hypot(e.x-p.x,e.y-p.y)<150)?1.10:1)*(keys.shift||(joyVec.active&&mag>.92)?1.3:1) /* Amazon trait: +10% speed while no foe is near (deepened by her Mastery trait perk) */*(p.rageT>0?1.25:1)*Math.max(mag,.35)*(_phz&&_phz.kind==='ice'?.6:1);
+ const spd=p.speed*(p.class==='Amazon'&&!enemies.some(e=>!e.dead&&Math.hypot(e.x-p.x,e.y-p.y)<150)?1.10:1) /* Amazon trait: +10% speed while no foe is near (deepened by her Mastery trait perk). v139 SPRINT REMOVED: the old (Shift || full-tilt joystick) x1.3 factor is gone — full tilt now just moves at base speed, like VS (no sprint), closing the last v138 parity escape valve. */*(p.rageT>0?1.25:1)*Math.max(mag,.35)*(_phz&&_phz.kind==='ice'?.6:1);
  /* v138 FULL PARITY: INSTANT velocity, exactly as VS — no accel ramp, no
     coast on release. The old exponential approach (rate 14/s, ~71ms time
     constant, ~0.2s to 95% speed) made reversals coast into the horde in a
