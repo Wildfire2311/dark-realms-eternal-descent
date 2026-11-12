@@ -343,7 +343,7 @@ function loadValidated(k,def,isValid){
 const isArr=v=>Array.isArray(v),isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v),isNum=v=>typeof v==='number'&&isFinite(v);
 function collectSaveData(){const out={_saveVersion:SAVE_VERSION,_gameVersion:(typeof GAME_VERSION!=='undefined'?GAME_VERSION:'')};['dr2_meta','dr2_records','dr2_uid','dr2_speed'].forEach(k=>{try{const raw=localStorage.getItem(k);if(raw!=null)out[k]=JSON.parse(raw)}catch(e){}});return out}
 /* ---- Report a Bug: version stamp + recent-error capture (no personal data) ---- */
-const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v147 (2026-11-12). v147 THE 8-WEAPONS ART WIRE-IN \u2014 the approved v146 pixel art, wired in: 21 sprites + 16 icons for the 8 new weapons and 8 Sigils, replacing every procedural fallback. Art only \u2014 no gameplay changes.";
+const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v148 (2026-11-12). v148 THE AI PILOT REWORK \u2014 Watch AI Play rebuilt: density-aware disengage, loot discipline, dash as a tool, the Red Death flee fix, boss-aware positioning, synergy level-up picks with reroll/skip/banish, shrine-seeking when hurt, and a Red Death endgame. Pilot only \u2014 no gameplay changes.";
 const BUG_ERRORS=[];
 function bugNoteError(msg){try{const s=String(msg==null?'Unknown error':msg).slice(0,300);BUG_ERRORS.push(new Date().toISOString()+' — '+s);if(BUG_ERRORS.length>10)BUG_ERRORS.shift()}catch(e){}}
 try{addEventListener('error',e=>{bugNoteError((e&&e.message)||'Script error')});addEventListener('unhandledrejection',e=>{const r=e&&e.reason;bugNoteError('Unhandled promise rejection: '+((r&&r.message)||r||'unknown'))})}catch(e){}
@@ -4583,6 +4583,30 @@ function aiLog(msg){aiLogLines.unshift(msg);if(aiLogLines.length>3)aiLogLines.po
 /* ---------------- Watch AI Play — the AI pilot ---------------- */
 let aiLastState='';
 let aiLootRef=null,aiLootT=0;const aiLootBans=[]; /* pickup pursuit memory: what the pilot is currently chasing, for how long, and which spots it has given up on (see aiTick) */
+let aiFleeAng=null,aiLevelAction=null,aiLevelSeen=-1; /* v148: the Red Death endgame flee line (kept stable across re-plans — see the Red Death branch) and the per-level tool budget (one reroll/skip/banish per level-up screen, reset when the level changes — see the level brain) */
+let aiStuckT=0,aiLastPX,aiLastPY; /* v148 fix: the stuck failsafe (aiTick) reads these every re-plan — with no declaration the read threw ReferenceError on every re-plan while the AI was on, so the failsafe never ran. aiLastPX/aiLastPY start undefined so the first re-plan's !==undefined check still skips correctly and the failsafe arms itself on the next re-plan */
+/* v148 PILOT PERCEPTION — the pilot's own read of the field. tryAutoCast's crowd150/200/340 are locals inside that function, so the pilot counts for itself with the same radii (150+e.r / 200+e.r / 340) instead of hoisting engine locals — no engine code moves. Everything here is a READ of game state; nothing writes to it. */
+function aiCrowd(p){let c150=0,c200=0,c340=0;for(const e of enemies){if(e.dead)continue;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<150+(e.r||12))c150++;if(d<200+(e.r||12))c200++;if(d<340)c340++}return{c150,c200,c340}}
+function aiNearCount(x,y,r){let n=0;for(const e of enemies){if(e.dead)continue;if(Math.hypot(e.x-x,e.y-y)<r)n++}return n}
+function aiCombatTarget(p){let best=null,bd=1e9;for(const e of enemies){if(e.dead||e.redDeath)continue;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<bd){bd=d;best=e}}return{e:best,d:bd}} /* the nearest foe the pilot may FIGHT — the Red Death is excluded here, not in nearest(), which other systems use unfiltered */
+function aiBossWindup(p,range){let best=null,bd=1e9;for(const e of enemies){if(e.dead||!e.boss)continue;if(!((e.windT||0)>0||(e.pendingVolley||0)>0||(e.pendingCharge||0)>0))continue;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<range&&d<bd){bd=d;best=e}}return best?{e:best,d:bd}:null} /* a boss mid-wind-up: the 0.4s windT strike, the Veilmother's 0.65s volley gather, or Gormaw's 0.8s charge pawing — all three are visible on the enemy record */
+function aiThinDir(p){const w=[0,0,0,0,0,0,0,0];let any=false;for(const e of enemies){if(e.dead)continue;const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy);if(d>420)continue;const wt=d<150?3:d<260?2:1,s=Math.floor(((Math.atan2(dy,dx)+Math.PI)/(Math.PI*2))*8+1e-9)%8; /* +1e-9: a foe sitting exactly on a sector boundary (e.g. due north) must round UP into its own sector — without it, float error drops it into the sector below and the weights lie */w[s]+=wt;w[(s+1)%8]+=wt*.5;w[(s+7)%8]+=wt*.5;any=true}if(!any)return null;let bi=0,bv=1e9;for(let i=0;i<8;i++){const a=(i+.5)*Math.PI/4-Math.PI;let v=w[i];if(aiVec&&(aiVec.x||aiVec.y))v-=(Math.cos(a)*aiVec.x+Math.sin(a)*aiVec.y)*.3;if(v<bv){bv=v;bi=i}}const ba=(bi+.5)*Math.PI/4-Math.PI;return{x:Math.cos(ba),y:Math.sin(ba)}} /* the thinnest of 8 sectors around the hero: foes weighted 3/2/1 by range band, half-weight spilling into neighbouring sectors so a pack on a boundary counts against both sides. Among near-equal sectors the one the pilot already travels wins — that continuity bonus is what stops re-plan jitter */
+function aiNearestShrine(p,maxD){let best=null,bd=maxD;const all=[];if(poi.shrine)all.push(poi.shrine);(poi.shrines||[]).forEach(sh=>all.push(sh));for(const sh of all){if(sh.used)continue;const d=Math.hypot(sh.x-p.x,sh.y-p.y);if(d<bd){bd=d;best=sh}}return best?{x:best.x,y:best.y,d:bd}:null} /* the nearest UNUSED shrine (the clearing's poi.shrine plus the travelling poi.shrines) — a shrine heals 20% max HP through the sustain budget and blesses +20% damage for 90s when walked over (36px) */
+/* v148 LEVEL BRAIN — synergy scoring. A card's <strong> names its piece (name + ' — Lv X → Y' or ' — NEW'); the name resolves to a WEAPONS / PASSIVES def (all 70 names are unique across both lists), and the pairing (weapon def .passive / passive def .weapon) is checked against what the build actually holds. Base scores keep the v106 order (evolution first); the synergy layer prefers cards that advance a held pairing over unrelated new pieces, and flags a NEW card whose pairing is DEAD (pair banished, or the pair's slots full with the pair unheld) — a dead pairing can never evolve, so the piece is banishable (bad=true). */
+function aiScoreCard(b,p){const t=b.textContent;let s=10,bad=false;const stEl=b.querySelector('strong'),st=stEl?stEl.textContent:'',nm=st.split(' \u2014 ')[0].trim(),isNew=st.indexOf(' \u2014 NEW')>=0,wd=WEAPONS.find(w=>w.name===nm),pd=!wd?PASSIVES.find(x=>x.name===nm):null;
+ if(t.includes('READY TO EVOLVE'))s=100;
+ else if(t.includes('COMPLETES PAIR')||t.includes('completes the evolution pairing'))s=95; /* the v147 phrase never appears on a card (the chip reads COMPLETES PAIR) — the 95 branch was dead until now; the old phrase stays as a harmless fallback */
+ else if(wd){const pairHeld=heldPassiveLvl(p,wd.passive)>0,pairDead=p.banished.includes(wd.passive)||(!pairHeld&&p.passives.length>=6);
+  if(isNew){s=pairHeld?85:70;if(!pairHeld&&p.weapons.length>=5)s=60;if(pairDead){s=55;bad=true}}
+  else{s=pairHeld?70:55;if(!pairHeld&&p.passives.length>=6)s=40}}
+ else if(pd){const hw=findWeapon(p,pd.weapon),pairDead=p.banished.includes(pd.weapon)||(!hw&&p.weapons.length>=6);
+  if(isNew){s=hw?85:65;if(!hw&&p.passives.length>=5)s=55;if(pairDead){s=50;bad=true}}
+  else{s=hw?65:55;if(!hw&&p.weapons.length>=6)s=45}}
+ else if(t.includes('Floor Chicken'))s=40;
+ else if(t.includes('Coin Bag'))s=35;
+ else if(t.includes('NEW WEAPON'))s=70;else if(t.includes('NEW PASSIVE'))s=65;else if(t.includes('Lv '))s=55;
+ if(p&&p.hp<p.maxHp*.4&&t.includes('Floor Chicken'))s=90;
+ return{b,s,bad,nm}}
 function aiTick(dt){
  if(!aiOn)return;if(state!==aiLastState){aiLastState=state;aiStateT=0}aiStateT+=dt;
  if(state==='play'&&player){const p=player;aiThink-=dt;p._aiPotT=Math.max(0,(p._aiPotT||0)-dt);
@@ -4593,7 +4617,9 @@ function aiTick(dt){
   /* movement brain, re-planned a few times a second */
   if(aiThink<=0){aiThink=.18;let mx=0,my=0,act='';
    const tele=teles.find(t=>t.hostile&&Math.hypot(p.x-t.x,p.y-t.y)<t.r+8);
-   const e=nearest();const dE=e?Math.hypot(e.x-p.x,e.y-p.y):1e9;
+   const _ct=aiCombatTarget(p),e=_ct.e,dE=_ct.d; /* v148: the combat target is the nearest living foe EXCLUDING the Red Death — nearest() has no type filter and other systems use it, so the pilot filters at its own level */
+   const rd=(redDeathRef&&!redDeathRef.dead)?redDeathRef:null,dRD=rd?Math.hypot(rd.x-p.x,rd.y-p.y):1e9;if(!rd)aiFleeAng=null; /* v148: the Red Death is never a combat target — its distance is tracked separately, and the endgame flee line resets while it is gone */
+   const _cr=aiCrowd(p),thin=aiThinDir(p),wind=aiBossWindup(p,300); /* v148: the pilot's own density read + the thinnest escape sector + any boss mid-wind-up (see the helpers above aiTick) */
    /* gather the most tempting pickup nearby — in the endless realms
       every pickup rests on floor by definition (there is no off-map),
       so the only filter left is the give-up list: a pickup the pilot
@@ -4610,16 +4636,27 @@ function aiTick(dt){
       it means it isn't collectable from here — ban the spot for 20s
       and move on, instead of being sucked into it indefinitely */
    if(loot){if(aiLootRef===loot){aiLootT+=.18;if(aiLootT>4.5){aiLootBans.push({x:loot.x,y:loot.y,until:elapsed+20});aiLootRef=null;aiLootT=0;loot=null;ld=1e9;setAiStatus('That pickup is out of reach — leaving it and moving on')}}else{aiLootRef=loot;aiLootT=0}}else aiLootRef=null;
-   if(tele){mx=p.x-tele.x;my=p.y-tele.y;act='Dodging the Dread Slam telegraph!';if(p.dashCd<=0)aiDash=true}
-   else if(p.hp<p.maxHp*.45&&e&&dE<190){mx=p.x-e.x;my=p.y-e.y;act='Hurt — kiting away to recover'} /* v100 (fix 3): kite trigger 30% -> 45% — the pilot retreats BEFORE the potion gate (50% / 60% boss) instead of after it, so it is already moving away when it drinks */
-   else if(loot&&ld>26&&(dE>120||ld<130)){mx=loot.x-p.x;my=loot.y-p.y;act=loot===null?'':'Scooping up XP, gold and loot'}
-   else if(e){const melee=p.class==='Barbarian'||p.class==='Paladin'||p.class==='Assassin'||p.class==='Nightwyrm'||p.class==='Pyromancer'; /* the Assassin, the Nightwyrm and the Pyromancer are close fighters — the pilot closes in like a Barbarian, and their close skills auto-cast at that range (the Pyromancer must stand in hose range to stack Burning) */const ideal=melee?52:175;
+   const ldTrue=loot?Math.hypot(loot.x-p.x,loot.y-p.y):1e9,_isHeart=!!loot&&hearts.includes(loot); /* v148: ld is WEIGHTED for hearts (x0.6 in the selection above), so loot discipline measures the true distance */
+   const lootSafe=!!loot&&ldTrue>p.pickup&&(_isHeart?(_cr.c200<=6&&aiNearCount(loot.x,loot.y,120)<=4):(_cr.c200<=3&&aiNearCount(loot.x,loot.y,120)<=2)); /* v148 LOOT DISCIPLINE: a pickup is chased only when the path is reasonably clear — gems/coins inside a dense pack are left alone until the pack thins or the magnet covers them (loot inside pickup range vacuums in on its own and needs no chase). Hearts when hurt get the looser gate: they stay high priority */
+   const shrine=(p.hp<p.maxHp*.55&&dE>190)?aiNearestShrine(p,1500):null; /* v148 SHRINE-SEEKING: hurt (below 55% HP), no foe within 190px, an unused shrine within 1500px — the pilot walks to the blessing instead of fighting or looting */
+   if(tele){mx=p.x-tele.x;my=p.y-tele.y;act='Dodging a telegraph — clearing the blast zone!';if(p.dashCd<=0)aiDash=true} /* v148: the status no longer names the Dread Slam — every boss telegraphs now, and the label should say what the pilot is actually doing */
+   else if(rd){ /* v148 RED DEATH ENDGAME: the Death is unkillable and its touch ends the run — once it exists, the whole game is a straight-line run to maximise distance. The flee line is STABLE across re-plans (a new angle is adopted only when it differs by >60°), so the pilot never jitters; it dashes on cooldown while the Death is close */
+    const _ra=Math.atan2(p.y-rd.y,p.x-rd.x);let _da=_ra-(aiFleeAng===null?_ra:aiFleeAng);while(_da>Math.PI)_da-=Math.PI*2;while(_da<-Math.PI)_da+=Math.PI*2;if(aiFleeAng===null||Math.abs(_da)>1.05)aiFleeAng=_ra;
+    mx=Math.cos(aiFleeAng);my=Math.sin(aiFleeAng);act='The Red Death hunts — holding the straight line';if(dRD<420&&p.dashCd<=0){aiDash=true;act='The Red Death hunts — dashing for distance!'}}
+   else if(wind){mx=p.x-wind.e.x;my=p.y-wind.e.y;act='Boss winding up — backing clear of the strike';if(wind.d<140&&p.dashCd<=0){aiDash=true;act='Boss winding up — dashing clear!'}} /* v148 BOSS RESPECT: never close on a boss mid-wind-up (windT / pendingVolley / pendingCharge) — back straight off, and dash clear when close */
+   else if(thin&&(_cr.c150>=4||_cr.c200>=8)){ /* v148 DENSITY-AWARE DISENGAGE: crowded (4+ foes inside ~150px, or 8+ inside ~200px) — steer toward the thinnest of 8 sampled sectors, BLENDED with the current goal (safe loot if any, else away from the nearest foe) so the pilot cuts away instead of hard-switching and jittering; the escape weight grows with the crush (0.55–0.85) */
+    let gx=0,gy=0;if(lootSafe){gx=loot.x-p.x;gy=loot.y-p.y}else if(e){gx=p.x-e.x;gy=p.y-e.y}else{gx=aiVec.x;gy=aiVec.y}const gl=Math.hypot(gx,gy)||1,we=.55+.3*Math.min(1,_cr.c150/8);
+    mx=thin.x*we+(gx/gl)*(1-we);my=thin.y*we+(gy/gl)*(1-we);act='Cutting out of the crush — thinnest way out';if(_cr.c150>=5&&p.dashCd<=0){aiDash=true;act='Surrounded — dashing for open ground!'}}
+   else if(p.hp<p.maxHp*.45&&e&&dE<190){ /* v100 (fix 3): kite trigger 30% -> 45% — the pilot retreats BEFORE the potion gate (50% / 60% boss) instead of after it, so it is already moving away when it drinks. v148: the hurt kite now steers by the thinnest sector blended with away-from-nearest — running from ONE foe used to carry it straight into the pack behind it */
+    if(thin){mx=thin.x*.6+(p.x-e.x)/(dE||1)*.4;my=thin.y*.6+(p.y-e.y)/(dE||1)*.4}else{mx=p.x-e.x;my=p.y-e.y}act='Hurt — kiting for open ground';if(dE<120&&p.dashCd<=0){aiDash=true;act='Hurt and pressed — dashing clear!'}} /* v148 fix: (dE||1) — a foe exactly on the hero (dE=0) must not NaN aiVec */
+   else if(shrine){mx=shrine.x-p.x;my=shrine.y-p.y;act='Hurt and clear — seeking a shrine blessing'}
+   else if(lootSafe){mx=loot.x-p.x;my=loot.y-p.y;act=_isHeart?'The path is clear — grabbing a heart':'Scooping up XP, gold and loot'} /* v148: loot only when the path is clear (see lootSafe) — no more diving into the pack for gems; the old gate (nearest foe > 120px OR loot < 130px) fired almost always, which is what dived the pilot into the horde */
+   else if(e){const melee=p.class==='Barbarian'||p.class==='Paladin'||p.class==='Assassin'||p.class==='Nightwyrm'||p.class==='Pyromancer'; /* the Assassin, the Nightwyrm and the Pyromancer are close fighters — the pilot closes in like a Barbarian, and their close skills auto-cast at that range (the Pyromancer must stand in hose range to stack Burning) */const ideal=e.boss?Math.max(melee?52:175,110):(melee?52:175); /* v148 BOSS RESPECT: a minimum 110px from bosses — melee no longer stands in contact range of a wind-up strike (ranged keeps 175); mini-bosses keep the normal band, they hit on contact like trash */
     const strafe=Math.sin(elapsed*.9)*.75;
-    if(dE>ideal+26){mx=e.x-p.x;my=e.y-p.y;act=(e.boss?('Closing on '+(e.bossName||'THE BOSS')):e.mini?('Hunting the mini-boss — '+(e.miniName||'')):e.redDeath?'Fleeing the Red Death!':'Closing on the horde') /* names the ACTUAL current boss (v64 soak fix) — it hardcoded the Dread Knight even when closing on Karghul, the Veilmother, Gormaw… */}
+    if(dE>ideal+26){mx=e.x-p.x;my=e.y-p.y;act=(e.boss?('Closing on '+(e.bossName||'THE BOSS')):e.mini?('Hunting the mini-boss — '+(e.miniName||'')):'Closing on the horde') /* names the ACTUAL current boss (v64 soak fix) — it hardcoded the Dread Knight even when closing on Karghul, the Veilmother, Gormaw… v148: the Red Death can no longer be the combat target, so the lying 'Fleeing the Red Death!' label is gone with the bug */}
     else if(dE<ideal-34){mx=p.x-e.x;my=p.y-e.y;act='Kiting — keeping the horde at range'}
     else{mx=-(e.y-p.y)*strafe+(e.x-p.x)*.12;my=(e.x-p.x)*strafe+(e.y-p.y)*.12;act=melee?'In the thick of it — auto-attacks swinging':'Orbiting the pack while auto-attacks fly'}
     if(dE<58&&p.dashCd<=0&&p.hp<p.maxHp*.55){aiDash=true;act='Dashing out of the crush!'}}
-   else if(loot){mx=loot.x-p.x;my=loot.y-p.y;act='Field is clear — gathering spoils'}
    else{mx=Math.cos(elapsed*.4);my=Math.sin(elapsed*.4);act='Patrolling for the next wave'}
    const l=Math.hypot(mx,my)||1;aiVec={x:mx/l,y:my/l};setAiStatus(act);
    /* stuck failsafe: nothing blocks movement now, but if the pilot
@@ -4634,15 +4671,30 @@ function aiTick(dt){
  /* level-up brain (v106): pick for the BUILD — evolution readiness
     first (a card that completes a pairing, or maxes a weapon while
     its passive is held), then new weapons / passives, then upgrades
-    of held pieces, then the coin-bag / chicken fallback; a Floor Chicken when badly hurt */
- if(state==='level'){if(aiStateT>.9){aiStateT=0;const btns=[...document.querySelectorAll('[data-up]')];if(!btns.length)return;
-   let best=btns[0],bs=-1;btns.forEach(b=>{const t=b.textContent;let s=10;
-    if(t.includes('READY TO EVOLVE'))s=100;else if(t.includes('completes the evolution pairing'))s=95;
-    else if(t.includes('NEW WEAPON'))s=70;else if(t.includes('NEW PASSIVE'))s=65;
-    else if(t.includes('Floor Chicken'))s=40;else if(t.includes('Coin Bag'))s=35;else if(t.includes('Lv '))s=55;
-    if(player&&player.hp<player.maxHp*.4&&t.includes('Floor Chicken'))s=90;
-    if(s>bs){bs=s;best=b}});
-   setAiStatus('Level up — choosing "'+(best.querySelector('strong')?best.querySelector('strong').textContent:'an upgrade')+'" for the build');best.click()}
+    of held pieces, then the coin-bag / chicken fallback; a Floor Chicken when badly hurt.
+    v148: synergy-aware scoring (aiScoreCard — cards that advance a held pairing outrank
+    unrelated new pieces, and a NEW card whose pairing is DEAD is banishable), plus the
+    tools the pilot never used: reroll / skip / banish, bought with run gold. RULES — at
+    most ONE tool action per level-up screen (tracked by aiLevelAction, reset when the
+    level changes; a redraw keeps the same level, so the budget survives redraws and the
+    pilot can never buy in a loop); every purchase checks gold first (reroll 1000g, skip
+    100g, banish 500g, +50% per buy in the run — toolCost); BANISH when a NEW card's
+    pairing is dead and no evolution-ready card is on the table (best ≤ 70); REROLL when
+    every card scores ≤ 45 (fallbacks and dead ends only); SKIP when nothing but Coin
+    Bags remains (best ≤ 35) and no reroll was taken. A bought banish is spent on the
+    NEXT tick (buying redraws the offer, so the fresh draw is re-checked before the ✕ is
+    clicked); if the fresh draw holds no dead piece, the held banish waits for a later
+    screen. The maxed terminal claim has no tool buttons — the null checks below leave
+    it on the plain pick path. */
+ if(state==='level'){if(player&&player.level!==aiLevelSeen){aiLevelSeen=player.level;aiLevelAction=null} /* v148: each level is a fresh screen — the one-tool-action budget resets with it */
+  if(aiStateT>.9){aiStateT=0;const btns=[...document.querySelectorAll('[data-up]')];if(!btns.length)return;
+   const scored=btns.map(b=>aiScoreCard(b,player));let best=scored[0],bs=-1;scored.forEach(x=>{if(x.s>bs){bs=x.s;best=x}});
+   if(aiLevelAction==='banishBought'&&(player.banishes||0)>0){const tgt=scored.find(x=>x.bad);if(tgt){const xx=tgt.b.querySelector('[data-banish]');if(xx){aiLevelAction='banished';setAiStatus('Banishing "'+tgt.nm+'" — its pairing is dead, so it can never evolve');xx.click();return}}aiLevelAction='done'} /* v148: the banish bought last tick — the fresh draw is re-checked before the ✕ is clicked; if it holds no dead piece, the held banish waits for a later screen and the pilot picks normally */
+   if(!aiLevelAction){const dead=scored.find(x=>x.bad);
+    if(dead&&bs<=70){if((player.banishes||0)>0){const xx=dead.b.querySelector('[data-banish]');if(xx){aiLevelAction='banished';setAiStatus('Banishing "'+dead.nm+'" — its pairing is dead, so it can never evolve');xx.click();return}}else if(gold>=toolCost('banish')){const bb=ui('banishBuyBtn');if(bb&&!bb.disabled){aiLevelAction='banishBought';setAiStatus('Buying a banish for "'+dead.nm+'" — its pairing is dead');bb.click();return}}} /* v148 BANISH: a NEW card whose pairing can never complete is dead weight in every future offer — buy the banish (500g base) and ✕ the card next tick. Only when no evolution-ready card is on the table (best ≤ 70): a great pick beats pool hygiene */
+    if(bs<=45){const rb=ui('rerollBtn');if(rb&&!rb.disabled&&((player.rerolls||0)>0||gold>=toolCost('reroll'))){aiLevelAction='rerolled';setAiStatus('A weak offer — rerolling for something that advances the build');rb.click();return}} /* v148 REROLL: every card scores ≤ 45 — no upgrade, no pairing progress — and the pilot can afford it (1000g base) or holds a free one */
+    if(bs<=35){const sb=ui('skipBtn');if(sb&&!sb.disabled&&((player.skips||0)>0||gold>=toolCost('skip'))){aiLevelAction='skipped';setAiStatus('Nothing here helps — skipping for XP toward the next level');sb.click();return}}} /* v148 SKIP: nothing but Coin Bags (≤ 35) and no reroll was taken — 100g base buys 20% of next-level XP */
+   setAiStatus('Level up — choosing "'+(best.b.querySelector('strong')?best.b.querySelector('strong').textContent:'an upgrade')+'" for the build');best.b.click()}
   else setAiStatus('Level up — weighing the three choices…');return}
  /* boss chest brain (v109): evolutions fire automatically
     as the chest opens, then the slot reels spin (~2.6s) — the pilot
