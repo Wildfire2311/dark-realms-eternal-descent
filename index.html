@@ -343,26 +343,31 @@ function loadValidated(k,def,isValid){
 const isArr=v=>Array.isArray(v),isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v),isNum=v=>typeof v==='number'&&isFinite(v);
 function collectSaveData(){const out={_saveVersion:SAVE_VERSION,_gameVersion:(typeof GAME_VERSION!=='undefined'?GAME_VERSION:'')};['dr2_meta','dr2_records','dr2_uid','dr2_speed'].forEach(k=>{try{const raw=localStorage.getItem(k);if(raw!=null)out[k]=JSON.parse(raw)}catch(e){}});return out}
 /* ---- Report a Bug: version stamp + recent-error capture (no personal data) ---- */
-const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v144 (2026-11-12). v144 VS SPECIALIZATION — the feedback overhaul: the whip trio's leech motes fly three different ways, gems bob/glow/sparkle and burst on pickup, gold drops as real coins and Reaper's Tithe drops real hearts, every explosion wears its element (holy rays, cold shards, poison cloud, violet nebula, layered fuel-air for the big ones), evolved weapons break the tempo ceilings (3.6/s no-CD basics, 0.35x CD floor) and the particle pool grows with the horde, every shot flashes at the casting hand and the Amazon draws her bow in sequence, Gravebow flies Widowmaker arrows and the Hammer is finally a hammer, root/weaken/choir-slow are visible and Corpse Charge wears a charge ring, the Death Spiral twins orbit differently and the rings stop piling up, every minute gets a banner, 30:00 is a WIN, pair completions get a fanfare and the ceremony plays above the chest, the twin-globe HUD is a VS top bar, difficulties are Dusk/Gloom/Nightfall, zones drop the Act prefix, and the last 14 dead D2 items are gone. The ONLY balance change is the tempo ceilings — no damage, cooldown or cost tables touched.";
+const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v145 (2026-11-12). v145 AUDIO REWORK — every weapon has its own sound (27 distinct attack/cast voices, starters keyed to the weapon not the class), the chest cuts the music for a tier-keyed two-part jingle, the four milestones split into four sounds (evolution grant, pair chime, Relic toll, 30:00 win fanfare), gems chime by tier and coins ring bright, the score is rebuilt as six driving 3+ minute tracks (32-chord progressions, a 120 BPM pulse, drums, per-zone riffs) whose intensity tracks the run (time, density, power) with a late-game layer, Red Death / magnet / heart / Pentagram / minute-banner / mini-boss sounds are all their own, the pick-alias bug is fixed, the streak sting is throttled, music tempo follows game speed, and music and SFX run on separate voice pools so the score never dissolves under load. AUDIO ONLY — zero gameplay changes.";
 const BUG_ERRORS=[];
 function bugNoteError(msg){try{const s=String(msg==null?'Unknown error':msg).slice(0,300);BUG_ERRORS.push(new Date().toISOString()+' — '+s);if(BUG_ERRORS.length>10)BUG_ERRORS.shift()}catch(e){}}
 try{addEventListener('error',e=>{bugNoteError((e&&e.message)||'Script error')});addEventListener('unhandledrejection',e=>{const r=e&&e.reason;bugNoteError('Unhandled promise rejection: '+((r&&r.message)||r||'unknown'))})}catch(e){}
 /* =====================================================================
-   AUDIO — full WebAudio synth engine (v70, gothic overhaul).
+   AUDIO — full WebAudio synth engine (v70 build, v145 rework).
    No samples and no copyrighted music: every sound is synthesised
-   in code, as original dark-fantasy figures — fingerpicked plucked
-   strings over a bowed low drone in long, sparse minor-key bars
-   through a generated cathedral reverb, humanised with random
-   detune, timing and velocity so nothing sits exactly on the grid.
-   Combat and feedback SFX are gritty noise / thump / struck-metal
-   work (no chiptune square waves),
-   voice-capped and per-kind throttled so a screen full of enemies
-   cannot turn into noise. Audio starts only after the first user
-   gesture (browser autoplay policy).
+   in code, as original dark-fantasy figures — a DRIVING score now,
+   not a meditation: six composed 3+ minute tracks (32-chord
+   progressions, a 120 BPM pulse, frame drums, per-zone riffs) over
+   a bowed low drone through a generated cathedral reverb, humanised
+   with random detune, timing and velocity so nothing sits exactly
+   on the grid, and INTENSITY that tracks the run (elapsed time,
+   enemy density, player power) with a late-game layer — minute 29
+   must not sound like minute 1. Combat and feedback SFX are gritty
+   noise / thump / struck-metal work (no chiptune square waves),
+   voice-capped PER POOL (music and SFX no longer eat each other)
+   and per-kind throttled so a screen full of enemies cannot turn
+   into noise. Every weapon has its own voice; every milestone its
+   own sound; pickups chime by tier. Audio starts only after the
+   first user gesture (browser autoplay policy).
    ===================================================================== */
-const AUD={ctx:null,master:null,sfxBus:null,musBus:null,ambBus:null,echoIn:null,noiseBuf:null,muted:false,vol:.8,sfxVol:.9,musVol:.8,musOn:true,voices:0,maxVoices:24,last:{},nextBar:0,barIdx:0,musTimer:null,intensity:.25,windGain:null,windFilter:null,ambBellT:14};
-const AU_THROTTLE={hit:.05,crit:.07,swing:.09,gem:.05,gold:.06,death:.055,hurt:.16,cast:.05,ui:.05};
-const AU_IMPORTANT={fanfare:1,level:1,evolve:1,boss:1,bossdie:1,gameover:1,streak:1,chest:1,rune:1,roar:1,descend:1}; /* v122: the v121 casino kinds (pickwin / jackpot) are DELETED with the casino level-up family — the milestone set is back to the pre-v121 members; 'level' stays important so the toned-down Arcade 3 chime is never dropped by the voice cap */
+const AUD={ctx:null,master:null,sfxBus:null,musBus:null,ambBus:null,echoIn:null,noiseBuf:null,muted:false,vol:.8,sfxVol:.9,musVol:.8,musOn:true,vMus:0,vSfx:0,maxVMus:40,maxVSfx:24,last:{},nextBar:0,barIdx:0,musTimer:null,intensity:.25,musCutUntil:0,windGain:null,windFilter:null,ambBellT:14}; /* v145 SPLIT VOICE POOLS: music (40) and SFX (24) have separate budgets — the old shared 24-voice pool let a dense horde dissolve the score exactly when the action peaked. Music gets 40 because a full-intensity bar is ~25 voices and the previous bar's ringing tail (~10) is still counted when the next bar schedules — 32 bound at peak and ate the late layer first (measured in the VM voice probe). One musical voice = one slot (a pluck's 4 partials are one pluck). The old AUD.voices/maxVoices fields are gone; the two diagnostics that read them (buildBugReport, __drAudio) now read vMus+vSfx. musCutUntil is the chest-sequence music cut (audio-clock time — see the 'chest' case) */
+const AU_THROTTLE={hit:.05,crit:.07,swing:.09,gem:.05,gold:.06,death:.055,hurt:.16,cast:.05,ui:.05,streak:2.5}; /* v145: the streak sting finally has a floor — 2.5s (game-speed-scaled like every throttle), so a dense horde can no longer congratulate you every few seconds on a loop */
+const AU_IMPORTANT={level:1,evolve:1,evogrant:1,pairchime:1,relic:1,winfanfare:1,boss:1,miniboss:1,bossdie:1,reddeath:1,gameover:1,streak:1,chest:1,chestdrop:1,pentwipe:1,gem:1,rune:1,roar:1,descend:1}; /* v145: 'fanfare' is SPLIT into evogrant/pairchime/relic/winfanfare (see sfx) — the shared milestone sound is gone. 'gem' joins the important set: the most-repeated interaction in the game is never dropped under load. The new once-per-run moments (reddeath, miniboss, pentwipe, chestdrop) are important too. 'level' stays important so the toned-down Arcade 3 chime is never dropped by the voice cap */
 const AU_THROTTLE2={reeltick:.045};Object.keys(AU_THROTTLE2).forEach(k=>{if(!AU_THROTTLE[k])AU_THROTTLE[k]=AU_THROTTLE2[k]}); /* v122: the v121 'reeldeal' throttle entry is gone with the level-up reel ticks; 'reeltick' remains for the boss-chest reels only, throttled so a fast chest spin can never machine-gun it */
 function auSettings(){try{if(typeof meta!=='undefined'&&meta&&meta.audio){AUD.muted=!!meta.audio.muted;if(typeof meta.audio.vol==='number')AUD.vol=meta.audio.vol;if(typeof meta.audio.sfxVol==='number')AUD.sfxVol=meta.audio.sfxVol;if(typeof meta.audio.musVol==='number')AUD.musVol=meta.audio.musVol;if(typeof meta.audio.mus==='boolean')AUD.musOn=meta.audio.mus}}catch(e){}}
 function auSave(){try{if(typeof meta!=='undefined'&&meta){meta.audio={muted:AUD.muted,vol:AUD.vol,sfxVol:AUD.sfxVol,musVol:AUD.musVol,mus:AUD.musOn};if(typeof saveAll==='function')saveAll()}}catch(e){}}
@@ -385,41 +390,55 @@ function audInit(){if(AUD.ctx)return;auSettings();const AC=window.AudioContext||
 function audEnsure(){if(!AUD.ctx)audInit();if(AUD.ctx){if(AUD.ctx.state==='suspended'){try{AUD.ctx.resume()}catch(e){}}musicStart();ambStart()}} /* AUDIO RECOVERY (SOAK FIX v62): the old version only started music/ambience on the ONE call that created the context and only resumed inside that same branch — if the context was created while the browser still held it suspended (autoplay policy, tab switch, OS interruption) and the creating gesture ended, music and SFX could stay silent for the whole session with the UI still showing Music: On / not muted. Now EVERY gesture ensures: context exists, is resumed if suspended, and the music timer + wind ambience are running (both starters are no-ops when already running) */
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)audEnsure()}); /* returning to a hidden/backgrounded tab re-runs the same recovery — browsers suspend the context while hidden */
 addEventListener('pointerdown',audEnsure);addEventListener('keydown',audEnsure);
-function auTone(o){if(!AUD.ctx)return;const ac=AUD.ctx,t0=o.at||ac.currentTime;if(AUD.voices>=AUD.maxVoices&&!o.imp)return;
+/* v145 POOL ACCOUNTING: a voice belongs to the MUSIC pool when it is
+   routed to the music bus, to the SFX pool otherwise (SFX + ambience).
+   auTake reserves n slots (important voices bypass the cap and are not
+   counted — the counters track droppable voices only); auFree releases
+   them when the source ends. */
+function auPoolOf(bus){return bus&&bus===AUD.musBus?'m':'s'}
+function auTake(bus,imp,n){if(imp)return true;n=n||1;if(auPoolOf(bus)==='m'){if(AUD.vMus+n>AUD.maxVMus)return false;AUD.vMus+=n}else{if(AUD.vSfx+n>AUD.maxVSfx)return false;AUD.vSfx+=n}return true}
+function auFree(bus,imp,n){if(imp)return;n=n||1;if(auPoolOf(bus)==='m')AUD.vMus=Math.max(0,AUD.vMus-n);else AUD.vSfx=Math.max(0,AUD.vSfx-n)}
+function auTone(o){if(!AUD.ctx)return;const ac=AUD.ctx,t0=o.at||ac.currentTime;const bus=o.bus||AUD.sfxBus;if(!auTake(bus,o.imp,1))return;
  const os=ac.createOscillator(),g=ac.createGain();os.type=o.type||'sine';os.frequency.setValueAtTime(Math.max(20,o.f),t0);
  if(o.f2)os.frequency.exponentialRampToValueAtTime(Math.max(20,o.f2),t0+(o.dur||.2));
  const v=o.vol||.1,dur=o.dur||.2;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(v,t0+(o.a||.008));g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
- os.connect(g);g.connect(o.bus||AUD.sfxBus);if(o.echo&&AUD.echoIn)g.connect(AUD.echoIn);if(o.verb&&AUD.verbSend)g.connect(AUD.verbSend);
- AUD.voices++;os.onended=()=>{AUD.voices--};os.start(t0);os.stop(t0+dur+.05)}
-function auNoise(o){if(!AUD.ctx)return;const ac=AUD.ctx,t0=o.at||ac.currentTime;if(AUD.voices>=AUD.maxVoices&&!o.imp)return;
+ os.connect(g);g.connect(bus);if(o.echo&&AUD.echoIn)g.connect(AUD.echoIn);if(o.verb&&AUD.verbSend)g.connect(AUD.verbSend);
+ os.onended=()=>{auFree(bus,o.imp,1)};os.start(t0);os.stop(t0+dur+.05)}
+function auNoise(o){if(!AUD.ctx)return;const ac=AUD.ctx,t0=o.at||ac.currentTime;const bus=o.bus||AUD.sfxBus;if(!auTake(bus,o.imp,1))return;
  const src=ac.createBufferSource();src.buffer=AUD.noiseBuf;src.loop=true;src.playbackRate.value=.7+Math.random()*.6;
  const fl=ac.createBiquadFilter();fl.type=o.type||'lowpass';fl.frequency.setValueAtTime(o.f||800,t0);if(o.f2)fl.frequency.exponentialRampToValueAtTime(Math.max(30,o.f2),t0+(o.dur||.2));fl.Q.value=o.q||.8;
  const g=ac.createGain(),v=o.vol||.1,dur=o.dur||.2;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(v,t0+(o.a||.006));g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
- src.connect(fl);fl.connect(g);g.connect(o.bus||AUD.sfxBus);if(o.echo&&AUD.echoIn)g.connect(AUD.echoIn);if(o.verb&&AUD.verbSend)g.connect(AUD.verbSend);
- AUD.voices++;src.onended=()=>{AUD.voices--};src.start(t0);src.stop(t0+dur+.05)}
+ src.connect(fl);fl.connect(g);g.connect(bus);if(o.echo&&AUD.echoIn)g.connect(AUD.echoIn);if(o.verb&&AUD.verbSend)g.connect(AUD.verbSend);
+ src.onended=()=>{auFree(bus,o.imp,1)};src.start(t0);src.stop(t0+dur+.05)}
 function auBell(f,dur,vol,at,bus){auTone({f:f,dur:dur,vol:vol,at:at,bus:bus,type:'sine',imp:1,echo:1,verb:1});auTone({f:f*2.74,dur:dur*.55,vol:vol*.45,at:at,bus:bus,type:'sine',imp:1,echo:1,verb:1});auTone({f:f*5.4,dur:dur*.28,vol:vol*.16,at:at,bus:bus,type:'sine',imp:1,echo:1,verb:1})}
-/* ---------------- plucked-string score (original dark-fantasy figures) ----
+/* ---------------- the score (v145 — driving, composed, escalating) ----
    Original figures composed for this game — no licensed music, melodies
-   or samples are used. The old engine was the "auto-tone" problem:
-   detuned sawtooth drones beating against each other and triangle
-   arpeggios snapped to a rigid 8th-note grid, every note at perfect
-   pitch and identical velocity. This engine replaces all of that:
-   - MUSIC is fingerpicked plucked strings (auPluck): a pick transient,
-     inharmonic string partials that decay at different rates, a closing
-     lowpass (the string darkening as it dies) and a slight downward
-     pitch sag, with per-note random detune, timing jitter and velocity
-     variation, so no two bars are ever played quite the same way.
-   - Under it, a low BOWED drone (sawtooth buried under a 220Hz lowpass —
-     a cello/bass floor, not a synth pad) and, at boss intensity, a
-     frame-drum heartbeat.
-   - Bars are 6 seconds long and SPARSE: whole bars can pass with only
-     the bass note and the drone, the way a quiet passage breathes.
-     The menu is sparser still.
-   - Everything musical runs through a generated cathedral reverb
-     (AUD.verbSend) built in audInit — a 2.6s decaying-noise impulse. */
-function auPluck(f,o){o=o||{};if(!AUD.ctx)return;const ac=AUD.ctx,t0=o.at||ac.currentTime;if(AUD.voices>=AUD.maxVoices&&!o.imp)return;
- const bus=o.bus||AUD.sfxBus,vol=o.vol||.12,dur=o.dur||1.6,f2=f*(1+(Math.random()-.5)*.0035); /* human detune: never exactly on pitch */
- auNoise({dur:.028,vol:vol*.45,at:t0,f:2600,type:'highpass',bus:bus}); /* fingertip / pick attack */
+   or samples are used. The v70 engine was a meditation: one 4-chord
+   loop per zone, 6-second sparse bars, the same 24 seconds for a
+   30-minute run. The v145 score is built for a survivor-like:
+   - SIX COMPOSED TRACKS, one per zone: 32-chord progressions in four
+     8-chord sections (A / B / A' / peak), ~3.2 minutes of harmonic
+     content per zone before anything repeats. Each zone also has its
+     own RIFF — a 4-note motif the figure plays at higher intensity,
+     transposed to the chord — and its own drum character.
+   - A DRIVING PULSE: 12 pulse slots per bar (120 BPM at 1x), a plucked
+     bass on the beat, frame drums in the field (not just at bosses),
+     and a late-game layer (ticking hats + high shimmer) that arrives
+     as intensity climbs past .68 — the last third of a run sounds
+     like the last third.
+   - INTENSITY TRACKS THE RUN (musicTick): elapsed time, enemy
+     density and player power (weapons + evolutions) all push it up,
+     on top of the boss/mini-boss responses. The menu stays sparse.
+   - TEMPO FOLLOWS GAME SPEED (auTempoMul): √gameSpeed, so 3x play
+     drives the score to ~1.73x tempo instead of an unplayable 3x.
+   - The craft is kept: fingerpicked plucked strings (auPluck — pick
+     transient, inharmonic partials, closing lowpass, pitch sag,
+     human detune / jitter / velocity), the bowed drone floor, the
+     generated cathedral reverb. The figure still breathes — it just
+     breathes on a pulse now. */
+function auPluck(f,o){o=o||{};if(!AUD.ctx)return;const ac=AUD.ctx,t0=o.at||ac.currentTime;const bus=o.bus||AUD.sfxBus;if(!auTake(bus,o.imp,1))return; /* one musical voice = one pool slot: the 4 partials are ONE pluck, and the pick transient rides inside it (imp:1, uncounted). Counting 4 starved the score — a full bar is 11+ plucks and the cap ate the late layer first */
+ const vol=o.vol||.12,dur=o.dur||1.6,f2=f*(1+(Math.random()-.5)*.0035); /* human detune: never exactly on pitch */
+ auNoise({dur:.028,vol:vol*.45,at:t0,f:2600,type:'highpass',bus:bus,imp:1}); /* fingertip / pick attack — part of the pluck's voice, not a second slot */
  const fl=ac.createBiquadFilter();fl.type='lowpass';fl.Q.value=.4;
  fl.frequency.setValueAtTime(Math.min(5200,f2*7),t0);fl.frequency.exponentialRampToValueAtTime(Math.max(300,f2*1.1),t0+dur*.7);
  const g=ac.createGain();g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+.004);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
@@ -428,64 +447,135 @@ function auPluck(f,o){o=o||{};if(!AUD.ctx)return;const ac=AUD.ctx,t0=o.at||ac.cu
   const os=ac.createOscillator();os.type=p[1];os.frequency.setValueAtTime(f2*p[0],t0);
   os.frequency.exponentialRampToValueAtTime(f2*p[0]*.998,t0+dur); /* a real string sags flat as it dies */
   const og=ac.createGain();og.gain.value=p[2];os.connect(og);og.connect(fl);os.start(t0);os.stop(t0+dur+.05);
-  AUD.voices++;os.onended=function(){AUD.voices--}})}
-function auBowed(f,dur,vol,at,bus){if(!AUD.ctx)return;const ac=AUD.ctx,t0=at||ac.currentTime;
+  os.onended=function(){if(p[0]===1)auFree(bus,o.imp,1)}})} /* only the fundamental frees the pluck's one slot */
+function auBowed(f,dur,vol,at,bus){if(!AUD.ctx)return;const ac=AUD.ctx,t0=at||ac.currentTime;const b=bus||AUD.musBus;if(!auTake(b,0,1))return; /* v145: the drone finally counts against its pool (it used to bypass the cap entirely) — one voice, one slot, freed by the sub's onended */
  const fl=ac.createBiquadFilter();fl.type='lowpass';fl.frequency.value=210;fl.Q.value=.5;
  const g=ac.createGain();g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+dur*.4);g.gain.linearRampToValueAtTime(vol*.72,t0+dur*.8);g.gain.linearRampToValueAtTime(0.0001,t0+dur);
- fl.connect(g);g.connect(bus||AUD.musBus);if(AUD.verbSend)g.connect(AUD.verbSend);
- [1,1.003].forEach(function(m){const os=ac.createOscillator();os.type='sawtooth';os.frequency.value=f*m;const og=ac.createGain();og.gain.value=.5;os.connect(og);og.connect(fl);os.start(t0);os.stop(t0+dur+.05);AUD.voices++;os.onended=function(){AUD.voices--}});
- const sub=ac.createOscillator();sub.type='sine';sub.frequency.value=f;sub.connect(fl);sub.start(t0);sub.stop(t0+dur+.05);AUD.voices++;sub.onended=function(){AUD.voices--}}
+ fl.connect(g);g.connect(b);if(AUD.verbSend)g.connect(AUD.verbSend);
+ [1,1.003].forEach(function(m){const os=ac.createOscillator();os.type='sawtooth';os.frequency.value=f*m;const og=ac.createGain();og.gain.value=.5;os.connect(og);og.connect(fl);os.start(t0);os.stop(t0+dur+.05)});
+ const sub=ac.createOscillator();sub.type='sine';sub.frequency.value=f;sub.connect(fl);sub.start(t0);sub.stop(t0+dur+.05);sub.onended=function(){auFree(b,0,1)}}
 function auDrum(at,vol,bus){if(!AUD.ctx)return;const t0=at||AUD.ctx.currentTime,v=vol||.16,b=bus||AUD.musBus;
  auTone({f:104,f2:41,dur:.34,vol:v,at:t0,bus:b,imp:1}); /* skin + body pitch drop */
  auNoise({dur:.06,vol:v*.32,at:t0,f:850,f2:280,bus:b})} /* hand slap */
 function auMetal(f,dur,vol,at,bus){if(!AUD.ctx)return;const t0=at||AUD.ctx.currentTime; /* struck metal: inharmonic partials, fast death — coins, clasps, shield rings */
  [[1,1],[2.76,.5],[5.40,.24],[8.93,.10]].forEach(function(p){auTone({f:f*p[0]*(1+(Math.random()-.5)*.004),dur:dur*(1.1-p[0]*.09),vol:vol*p[1],at:t0,bus:bus,type:'sine',imp:1})})}
-/* One chord per 6s bar. prog chords: b = bass offset in semitones from
-   the act root, n = pluckable chord tones (semitone offsets, guitar
-   register). All minor-key, wide, and unresolved — the descent never
+/* One chord per bar; AU_BAR is the 1x bar length (auTempoMul scales it
+   with game speed — see below). prog chords: b = bass offset in
+   semitones from the zone root, n = pluckable chord tones in semitones
+   ABOVE THE CHORD'S OWN BASS (scheduleBar sounds them as
+   bassF*2^(n/12), so the voicing rides the bass). Every zone runs a
+   32-chord progression in four 8-chord sections (A / B / A' / peak) —
+   ~3.2 minutes of harmonic content per zone at 1x, not a 24-second
+   loop. Each zone also carries its own RIFF (a 4-note motif, semitone
+   offsets above the chord root, played by the figure at higher
+   intensity) and its own DRUMS character (0 sparse, 1 standard,
+   2 driving). All minor-key, wide, and unresolved — the descent never
    cadences home. */
 const AU_BAR=6.0;
+const AU_CHORD={m:[12,15,19,24],M:[12,16,19,24],'5':[12,19,24,31],dim:[12,15,18,24],sus:[12,17,19,24]};
+function auProg(spec){return spec.map(function(c){return{b:c[0],n:(AU_CHORD[c[1]]||AU_CHORD.m).slice()}})}
 const ACT_MUSIC=[
- {root:55.00,prog:[{b:0,n:[12,15,19,24]},{b:3,n:[15,19,22,27]},{b:0,n:[12,19,24,27]},{b:-5,n:[7,10,14,19]}]},   /* Blood Moor: Am · C · Am · Em, open strings */
- {root:73.42,prog:[{b:0,n:[12,15,19,24]},{b:-4,n:[8,12,15,20]},{b:5,n:[17,20,24,29]},{b:0,n:[12,19,22,24]}]},   /* Catacombs: Dm · Bb · Gm · Dm */
- {root:82.41,prog:[{b:0,n:[12,15,19,24]},{b:-9,n:[3,7,10,15]},{b:5,n:[17,21,24,29]},{b:-2,n:[10,14,17,22]}]},  /* Cursed Forest: Em · C · A · G */
- {root:92.50,prog:[{b:0,n:[12,15,19,24]},{b:-7,n:[5,9,12,17]},{b:-5,n:[7,11,14,19]},{b:0,n:[12,17,19,24]}]},   /* Frozen Wasteland: F#m · D · E · F#m */
- {root:65.41,prog:[{b:0,n:[12,15,19,24]},{b:-4,n:[8,12,16,20]},{b:3,n:[15,19,22,27]},{b:7,n:[19,22,26,31]}]},   /* Demonic Fortress: Cm · Ab · Eb · G */
- {root:49.00,prog:[{b:0,n:[12,15,19,24]},{b:-9,n:[3,7,11,15]},{b:-2,n:[10,14,19,22]},{b:5,n:[17,20,24,29]}]}]; /* The Abyss: Gm · Eb · F · Dm — lowest, sparsest */
+ {root:55.00,riff:[0,3,7,12],drums:2,prog:auProg([ /* Blood Moor (A minor): open, heroic — arpeggio-climb riff, driving drums */
+  [0,'m'],[3,'M'],[8,'M'],[10,'M'],[0,'m'],[3,'M'],[8,'M'],[10,'M'],
+  [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[8,'M'],[5,'m'],[7,'M'],
+  [0,'m'],[3,'M'],[8,'M'],[10,'M'],[0,'m'],[3,'M'],[5,'m'],[7,'M'],
+  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[10,'M'],[8,'M'],[7,'M']])},
+ {root:73.42,riff:[12,7,3,0],drums:0,prog:auProg([ /* Catacombs (D minor): darker, chromatic ii° — falling riff, sparse drums, the drips carry it */
+  [0,'m'],[5,'m'],[8,'M'],[7,'M'],[0,'m'],[5,'m'],[8,'M'],[7,'M'],
+  [0,'m'],[8,'M'],[2,'dim'],[7,'M'],[0,'m'],[5,'m'],[3,'M'],[10,'M'],
+  [0,'m'],[5,'m'],[8,'M'],[7,'M'],[0,'m'],[8,'M'],[3,'M'],[7,'M'],
+  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[5,'m'],[7,'M'],[0,'m']])},
+ {root:82.41,riff:[0,7,3,12],drums:1,prog:auProg([ /* Cursed Forest (E minor): folk-minor — open-leap riff, standard drums */
+  [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[8,'M'],[3,'M'],[10,'M'],
+  [0,'m'],[3,'M'],[10,'M'],[8,'M'],[0,'m'],[5,'m'],[7,'M'],[10,'M'],
+  [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[3,'M'],[5,'m'],[7,'M'],
+  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[10,'M'],[8,'M'],[7,'M']])},
+ {root:92.50,riff:[0,12,7,3],drums:2,prog:auProg([ /* Frozen Wasteland (F# minor): cold, wide, minor-V — wide riff, driving drums */
+  [0,'m'],[7,'m'],[8,'M'],[3,'M'],[0,'m'],[7,'m'],[8,'M'],[3,'M'],
+  [0,'m'],[8,'M'],[5,'m'],[7,'m'],[0,'m'],[3,'M'],[10,'M'],[7,'m'],
+  [0,'m'],[7,'m'],[8,'M'],[3,'M'],[0,'m'],[8,'M'],[5,'m'],[7,'M'],
+  [0,'m'],[10,'M'],[7,'m'],[8,'M'],[0,'m'],[10,'M'],[7,'M'],[0,'m']])},
+ {root:65.41,riff:[0,0,7,12],drums:2,prog:auProg([ /* Demonic Fortress (C minor): heavy, V-driven — pedal-tone riff, driving drums */
+  [0,'m'],[7,'M'],[8,'M'],[7,'M'],[0,'m'],[7,'M'],[8,'M'],[7,'M'],
+  [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[5,'m'],[7,'M'],[7,'M'],
+  [0,'m'],[7,'M'],[8,'M'],[7,'M'],[0,'m'],[8,'M'],[5,'m'],[7,'M'],
+  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[10,'M'],[8,'M'],[7,'M']])},
+ {root:49.00,riff:[0,3,0,7],drums:0,prog:auProg([ /* The Abyss (G minor): lowest, doom — tread riff, slow sparse drums */
+  [0,'m'],[5,'m'],[0,'m'],[7,'M'],[0,'m'],[5,'m'],[0,'m'],[7,'M'],
+  [0,'m'],[8,'M'],[5,'m'],[7,'M'],[0,'m'],[3,'M'],[10,'M'],[7,'M'],
+  [0,'m'],[5,'m'],[0,'m'],[7,'M'],[0,'m'],[8,'M'],[3,'M'],[7,'M'],
+  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[5,'m'],[7,'M'],[0,'m']])}];
+/* v145 TEMPO FOLLOWS GAME SPEED: the score's tempo multiplier is
+   √gameSpeed — 1x at 1x, ~1.41x at 2x, ~1.73x at 3x (a 120 BPM pulse
+   becomes ~208 BPM at 3x). A literal 3x tempo (360 BPM) would blur
+   the plucked figures into noise; √ scaling keeps the score clearly
+   faster — and the progression cycling faster — while it stays
+   musical. All bar timings derive from auBarLen(), so a speed change
+   takes effect within ~2s (the scheduler looks 1.8s ahead). */
+function auTempoMul(){return Math.sqrt(typeof gameSpeed==='number'&&gameSpeed>0?gameSpeed:1)}
+function auBarLen(){return AU_BAR/auTempoMul()}
 function musicStart(){if(!AUD.ctx||AUD.musTimer)return;AUD.nextBar=AUD.ctx.currentTime+.15;AUD.barIdx=0;AUD.musTimer=setInterval(musicTick,300)}
 function musicTick(){if(!AUD.ctx)return;const ac=AUD.ctx;
+ /* v145 INTENSITY IS A GRADIENT, not boss/not-boss: elapsed time
+    (+.35 by 30:00), live enemy density (+.15 at 300 foes) and player
+    power (+.15 for a full evolved build) all push it up from the .25
+    baseline, so minute 29 sounds nothing like minute 1. The boss
+    (1.0) and mini-boss / Red Death (.6 floor) responses are kept. */
  let inten=.25;
- if(bossRef&&!bossRef.dead)inten=1;else if(enemies.some(e=>(e.mini||e.redDeath)&&!e.dead))inten=.6;else if(state==='menu'||state==='gallery')inten=.15;
+ if(state==='menu'||state==='gallery')inten=.15;
+ else{
+  const el=typeof elapsed==='number'?elapsed:0;
+  inten+=Math.min(.35,el/1800*.35);
+  try{const alive=(typeof enemies!=='undefined'?enemies.filter(e=>!e.dead).length:0);inten+=Math.min(.15,alive/300*.15)}catch(e){}
+  try{if(typeof player!=='undefined'&&player&&player.weapons){const ev=player.weapons.filter(w=>w.evo).length;inten+=Math.min(.15,(player.weapons.length+ev*1.5)/15*.15)}}catch(e){}
+  if(bossRef&&!bossRef.dead)inten=1;else if(enemies.some(e=>(e.mini||e.redDeath)&&!e.dead))inten=Math.max(inten,.6);
+ }
  AUD.intensity+=(inten-AUD.intensity)*.35;
  const inGame=state==='play'||state==='level'||state==='slotchest'||state==='inventory'||state==='pause'||state==='codex';
- AUD.musBus.gain.setTargetAtTime(AUD.musOn?(inGame?.6:.4)*(AUD.musVol/.8):0,ac.currentTime,.8);
- while(AUD.nextBar<ac.currentTime+1.8){scheduleBar(AUD.nextBar);AUD.nextBar+=AU_BAR;AUD.barIdx++}
+ const cut=AUD.musCutUntil&&ac.currentTime<AUD.musCutUntil; /* v145 CHEST CUT: while a chest sequence runs, the music bus is silent — the jingle owns the mix (see the 'chest' case) */
+ AUD.musBus.gain.setTargetAtTime(cut?0:(AUD.musOn?(inGame?.6:.4)*(AUD.musVol/.8):0),ac.currentTime,cut?.06:.8);
+ while(AUD.nextBar<ac.currentTime+1.8){scheduleBar(AUD.nextBar);AUD.nextBar+=auBarLen();AUD.barIdx++}
  ambTick()}
 function scheduleBar(t0){const cfg=ACT_MUSIC[zoneIdx]||ACT_MUSIC[0],inten=AUD.intensity,chord=cfg.prog[AUD.barIdx%cfg.prog.length];
+ const BL=auBarLen(),SL=BL/12; /* 12 pulse slots per bar — a 120 BPM pulse at 1x, ~208 BPM at 3x */
  const bassF=cfg.root*Math.pow(2,chord.b/12),R=Math.random;
  const quiet=state==='menu'||state==='gallery';
  /* the floor: bowed root + fifth, felt more than heard */
- auBowed(bassF,AU_BAR+.5,.040+inten*.022,t0,AUD.musBus);
- auBowed(bassF*1.5,AU_BAR+.5,.016+inten*.010,t0+AU_BAR*.5,AUD.musBus);
- /* bass string, plucked once on the guitar's low strings */
- auPluck(bassF*2,{at:t0+.03+R()*.05,dur:3.4,vol:.15,bus:AUD.musBus,imp:1});
- /* ~1 bar in 5 is near-empty — drone and bass only. The silence is the sound. */
- if(R()<.2)return;
- /* fingerpicked figure: a shuffled handful of chord tones at human,
-    off-grid times, each with its own velocity. Never the full grid. */
+ auBowed(bassF,BL+.5,.040+inten*.022,t0,AUD.musBus);
+ auBowed(bassF*1.5,BL+.5,.016+inten*.010,t0+BL*.5,AUD.musBus);
+ /* bass pulse: plucked bass on the beat — one note in the menu, a
+    driving three-note pulse in the field */
+ const bassSlots=quiet?[0]:(inten>=.5?[0,4,8]:[0,6]);
+ bassSlots.forEach(function(s){auPluck(bassF*2,{at:t0+s*SL+.02+R()*.03,dur:Math.min(1.6,BL*.28),vol:.13,bus:AUD.musBus,imp:1})});
+ /* drums: a frame-drum pulse in the field — not just at bosses any
+    more. Sparse zones (Catacombs, Abyss) keep one heavy kick; the
+    rest get the half-bar kick, and at higher intensity the off-beats
+    join in. The late-game layer (intensity ≥ .68) adds a ticking hat
+    on every other pulse — the last third of a run drives. */
+ if(!quiet){const dm=cfg.drums||1;
+  auDrum(t0+.02,dm===0?.18:.15,AUD.musBus);
+  if(dm>=1)auDrum(t0+6*SL,.11,AUD.musBus);
+  if(inten>=.5&&dm>=1){auDrum(t0+3*SL,.08,AUD.musBus);auDrum(t0+9*SL,.08,AUD.musBus)}
+  if(inten>=.68){for(let s=0;s<12;s+=2)auNoise({dur:.03,vol:.02,at:t0+s*SL,f:5200,type:'highpass',bus:AUD.musBus})}}
+ /* fingerpicked figure on the off-slots: at intensity ≥ .45 the first
+    four notes are the zone's RIFF (transposed to the chord), the rest
+    shuffled chord tones — the track's melodic identity, not just its
+    harmony. Timing jitter is tight now (±.06s): a hand on a pulse,
+    not a wanderer. */
  const tones=chord.n.slice();for(let i=tones.length-1;i>0;i--){const j=Math.floor(R()*(i+1)),tmp=tones[i];tones[i]=tones[j];tones[j]=tmp}
- let count=quiet?2+Math.floor(R()*2):3+Math.floor(R()*(2+inten*3)); /* town 2-3 · field 3-5 · elite/boss up to 7 */
- if(R()<.25)count=Math.max(1,count-2); /* some bars barely speak */
- const slots=[.8,1.7,2.6,3.4,4.3,5.1];
- for(let i=0;i<Math.min(count,tones.length+2);i++){
-  const st=tones[i%tones.length]+(i>=tones.length?12:0); /* second pass climbs an octave */
-  const at=t0+slots[Math.min(i,slots.length-1)]+(R()-.5)*.13; /* timing jitter — a hand, not a sequencer */
-  auPluck(bassF*Math.pow(2,st/12),{at:at,dur:2.1+R()*0.9,vol:(.055+R()*.075)*(0.8+inten*.5),bus:AUD.musBus})}
- /* now and then the figure answers itself an octave down, late in the bar */
- if(R()<.3)auPluck(bassF*Math.pow(2,(chord.n[0]+12)/12),{at:t0+4.9+(R()-.5)*.15,dur:2.4,vol:.06,bus:AUD.musBus});
- /* dread pulse: only when something big is alive */
- if(inten>.75){auDrum(t0+.05,.15,AUD.musBus);auDrum(t0+AU_BAR/2,.11,AUD.musBus);
-  auPluck(bassF*2,{at:t0+AU_BAR/2+.02,dur:1.6,vol:.10,bus:AUD.musBus})}}
+ let count=quiet?2+Math.floor(R()*2):3+Math.floor(R()*(2+inten*3)); /* menu 2-3 · field 3-5 · peak up to 7 */
+ const figSlots=[1,2,5,7,10,11,4];
+ for(let i=0;i<Math.min(count,figSlots.length);i++){
+  let st;
+  if(!quiet&&inten>=.45&&i<4&&cfg.riff)st=cfg.riff[i]+12; /* the motif, in the guitar register above the chord's bass */
+  else st=tones[i%tones.length]+(i>=tones.length?12:0); /* second pass climbs an octave */
+  const at=t0+figSlots[i]*SL+(R()-.5)*.06;
+  auPluck(bassF*Math.pow(2,st/12),{at:at,dur:BL*.3+R()*.3,vol:(.055+R()*.075)*(0.8+inten*.5),bus:AUD.musBus})}
+ /* now and then the figure answers itself two octaves up, late in the bar */
+ if(R()<.3)auPluck(bassF*4,{at:t0+10*SL+(R()-.5)*.08,dur:BL*.35,vol:.05,bus:AUD.musBus});
+ /* late-game shimmer: a high bell-ping on the beat at intensity ≥ .68,
+    over the drive — the score's top end opens up with the run */
+ if(!quiet&&inten>=.68){auTone({f:bassF*8,dur:.8,vol:.028,at:t0+.03,bus:AUD.musBus,type:'sine',verb:1});auTone({f:bassF*8*Math.pow(2,(chord.n[1]||15)/12),dur:.8,vol:.022,at:t0+6*SL,bus:AUD.musBus,type:'sine',verb:1})}}
 /* ---------------- environmental ambience: wind, drips, bells ---------------- */
 function ambStart(){if(!AUD.ctx||AUD.windGain)return;const ac=AUD.ctx;
  const src=ac.createBufferSource();src.buffer=AUD.noiseBuf;src.loop=true;
@@ -513,11 +603,11 @@ function ambTick(){if(!AUD.ctx||!AUD.windGain)return;const ac=AUD.ctx,z=zoneIdx;
    Every pitched hit is randomly detuned a few cents and every repeat
    varies, so identical swings never sound sample-identical. */
 function sfx(kind,o){
- o=o||{};if(kind==='die')kind='death';else if(kind==='legend')kind='fanfare';else if(kind==='pick')kind='gem';
+ o=o||{};if(kind==='die')kind='death';else if(kind==='legend')kind='relic'; /* v145: the 'pick'→'gem' alias is DELETED — it shadowed the live 'pick' case, so every level-up pick played the gem click and the intended two-pluck 'chosen' sound could never run. 'die'→'death' stays (no 'die' case exists — nothing is shadowed, and no call site uses 'die'). 'legend' now tolls as a Relic: 'fanfare' itself is split into four milestone kinds (evogrant / pairchime / relic / winfanfare, below) */
  if(!AUD.ctx||AUD.muted)return;if(AUD.ctx.state==='suspended'&&AU_IMPORTANT[kind]){try{AUD.ctx.resume()}catch(e){}} /* AUDIO RECOVERY (v62): a milestone sound (level-up fanfare, boss, legendary) landing while the context is suspended makes its own resume attempt instead of scheduling into a frozen clock and being lost */
  const ac=AUD.ctx,t=ac.currentTime;
  const th=AU_THROTTLE[kind];if(th){const thx=th*gameSpeed;if(t-(AUD.last[kind]||0)<thx)return;AUD.last[kind]=t}
- if(AUD.voices>=AUD.maxVoices&&!AU_IMPORTANT[kind])return;
+ if(AUD.vSfx>=AUD.maxVSfx&&!AU_IMPORTANT[kind])return; /* v145: the gate reads the SFX pool — music has its own budget now, so a dense horde can no longer silence the score through this gate */
  const R=Math.random;
  const thump=function(f0,f1,dur,vol,at){auTone({f:f0*(1+(R()-.5)*.02),f2:f1,dur:dur,vol:vol,at:at||t,imp:1})}; /* body impact: a mass, not a beep */
  const swish=function(f0,f1,dur,vol,at){auNoise({dur:dur,vol:vol,at:at||t,f:f0,f2:f1,type:'bandpass',q:1.1})}; /* air / cloth / blade */
@@ -530,28 +620,45 @@ function sfx(kind,o){
   else{auNoise({dur:.07,vol:.12,f:950,f2:260});thump(150,72,.07,.10)} /* flesh + weight */
   break}
  case 'crit':auNoise({dur:.09,vol:.13,f:1500,f2:350});thump(120,50,.12,.13);auMetal(1750,.14,.03,t,AUD.sfxBus);break; /* a heavier hit with a metal edge, not a rising ding */
- case 'swing':{const c=o.cls;
-  if(c==='Sorceress')swish(900,320,.1,.045); /* staff sweep */
+ case 'swing':{const c=o.cls,w=o.w; /* v145: the sound follows the WEAPON, not the class — every starter is identifiable by ear. The class swings survive as the fallback (and gain Pyromancer + Nightwyrm, who fell through to the default heavy arc before) */
+  if(w==='ashblade'){swish(300,1150,.14,.075);auMetal(1250,.12,.014,t+.02,AUD.sfxBus);thump(120,60,.1,.06)} /* Ashen Blade: a heavy cleave — low arc, steel ring, weight */
+  else if(w==='frostwand'){auTone({f:520,f2:980,dur:.12,vol:.05,type:'sine'});auTone({f:1560,dur:.1,vol:.02,at:t+.05,type:'sine'})} /* Frostbrand: homing missiles go PEW — a rising arcane blip + sparkle, never a staff sweep */
+  else if(w==='ironbark'){auNoise({dur:.04,vol:.06,f:1800,type:'highpass'});swish(1400,3200,.09,.05)} /* Ironbark: thorn darts — a woody snap + a dart whistle */
+  else if(w==='bonewand'){auNoise({dur:.03,vol:.05,f:2300,type:'highpass'});auNoise({dur:.03,vol:.04,at:t+.04,f:1900,type:'highpass'});swish(900,2400,.08,.045)} /* Bone Wand: dry bone rattle + a shard's whistle */
+  else if(w==='blessedmace'){auBell(523,.9,.035,t,AUD.sfxBus);thump(110,55,.12,.08)} /* Blessed Mace: holy smite — a chapel bell + a consecrated thump */
+  else if(w==='gravebow')swish(800,2400,.08,.06); /* Gravebow: the bowstring release + arrow air — the one starter whose class sound already fit, kept as its identity */
+  else if(w==='venomfang'){swish(600,1800,.12,.06);auNoise({dur:.1,vol:.025,f:3200,type:'highpass'})} /* Venomfang: a spinning axe whistle + a poison hiss */
+  else if(w==='shadowfang'){for(let i=0;i<3;i++)swish(500+i*200,1600+i*300,.05,.04,t+i*.03);auNoise({dur:.12,vol:.02,f:900,f2:300})} /* Shadowfang: a triple claw rake, each claw its own cut, over a shadow breath */
+  else if(w==='embershroud'){auNoise({dur:.3,vol:.05,f:400,f2:1400});auNoise({dur:.12,vol:.03,f:2400,type:'highpass'})} /* Ember Shroud: the aura breathes fire — a soft whoomph + crackle on its 1s tick (it was silent before; it never swung) */
+  else if(c==='Sorceress')swish(900,320,.1,.045); /* staff sweep */
   else if(c==='Necromancer'){swish(700,260,.09,.04);auNoise({dur:.05,vol:.025,f:2400,type:'highpass'})}
   else if(c==='Paladin'){swish(500,150,.13,.06);auMetal(1250,.1,.012,t+.02,AUD.sfxBus)} /* blade + a breath of steel */
   else if(c==='Druid')swish(420,1300,.11,.055); /* claw rake, rising */
   else if(c==='Amazon')swish(800,2400,.08,.06); /* bowstring release + arrow air */
   else if(c==='Assassin')swish(1300,3000,.06,.06); /* dagger flick */
+  else if(c==='Pyromancer'){auNoise({dur:.22,vol:.06,f:350,f2:1200});auNoise({dur:.05,vol:.03,f:2600,type:'highpass'})} /* v145: the Pyromancer's own swing — an ember crackle, not a sword */
+  else if(c==='Nightwyrm'){swish(700,220,.09,.05);swish(900,300,.08,.045,t+.05);auNoise({dur:.14,vol:.02,f:800,f2:250})} /* v145: the Nightwyrm's own swing — a shadow double-rake, not a heavy arc */
   else swish(300,1150,.14,.075); /* heavy melee arc */
   break}
- case 'cast':{const ty=o.type;
+ case 'cast':{const ty=o.type; /* v145: all 9 default-branch weapons get their own cast sound — flail, orbit, choir, rune, freeze, bulwark, scythe, legion, needle. The 10 dead branches (slam, rage, summonskel, holyfire, judge, tartrap, shivs, contract, multishot, explosive) are DELETED — no live weapon has those engines (skills take type from WEAPONS.def.engine, single skills.push in syncWeaponSkills), so they could never fire */
   if(ty==='fireball'){auNoise({dur:.34,vol:.12,f:280,f2:1500});auNoise({dur:.3,vol:.07,at:t+.05,f:400,f2:120});thump(80,150,.28,.05)} /* whoomph of lit air */
   else if(ty==='chain'){for(let i=0;i<4;i++)auNoise({dur:.035,vol:.08,at:t+i*.04+R()*.015,f:3300,type:'highpass'});auNoise({dur:.14,vol:.05,f:1800,f2:500,type:'bandpass'})}
   else if(ty==='blizzard'){auNoise({dur:.55,vol:.075,f:1200,f2:650,type:'bandpass'});auMetal(3400,.2,.012,t+.1,AUD.sfxBus)} /* wind + far ice */
   else if(ty==='whirl'){auNoise({dur:.45,vol:.1,f:380,f2:1500,type:'bandpass',q:1.5})}
-  else if(ty==='slam'){thump(115,34,.32,.2);auNoise({dur:.24,vol:.13,f:480,f2:110})} /* ground breaks */
-  else if(ty==='rage'){auTone({f:72,f2:120,dur:.42,vol:.1,type:'sawtooth'});auNoise({dur:.3,vol:.07,f:350,f2:800})} /* a low shout — kept dark by its register */
+  else if(ty==='flail'){for(let i=0;i<3;i++)auNoise({dur:.03,vol:.05,at:t+i*.05+R()*.015,f:2100,type:'highpass'});swish(200,900,.3,.09);thump(95,40,.25,.12)} /* Graveflail: chain rattle, then the huge slow sweep, then the weight landing */
+  else if(ty==='orbit'){auTone({f:1175,dur:.4,vol:.022,type:'sine',verb:1});auTone({f:1760,dur:.35,vol:.016,at:t+.08,type:'sine',verb:1})} /* Wisp Lantern: a soft chiming shimmer — quiet on purpose, it pulses every 0.5s */
+  else if(ty==='choir'){auPluck(523,{at:t,dur:1,vol:.05,bus:AUD.sfxBus});auPluck(784,{at:t+.09,dur:1,vol:.045,bus:AUD.sfxBus});auBell(1046,1.2,.03,t+.16,AUD.sfxBus)} /* Choir of the Deep: the column sings — a rising plucked figure + a high bell (the strike itself still tolls 'bell') */
+  else if(ty==='rune'){auMetal(2100,.18,.03,t,AUD.sfxBus);auTone({f:1800,f2:2600,dur:.1,vol:.03,type:'sine',at:t+.06})} /* Rune Rebound: a crystal chime + a ricochet ping */
+  else if(ty==='freeze'){auNoise({dur:.06,vol:.06,f:4200,type:'highpass'});auMetal(3400,.15,.015,t,AUD.sfxBus);auNoise({dur:.4,vol:.06,f:1500,f2:500,type:'bandpass'})} /* Frostbite Hour: ice cracking + a cold beam sweeping out (sharper than the blizzard's storm wind) */
+  else if(ty==='bulwark'){auMetal(980,.3,.05,t,AUD.sfxBus);auBell(196,1.6,.05,t+.05,AUD.sfxBus)} /* Bulwark Oath: shield iron ringing true + a low oath bell */
+  else if(ty==='scythe'){swish(400,1800,.22,.08);auMetal(1450,.2,.02,t+.08,AUD.sfxBus)} /* Reaper's Tithe: a wide reaping swish + a metallic whisper at the cut */
+  else if(ty==='legion'){swish(500,2000,.12,.07);auMetal(1750,.14,.025,t+.03,AUD.sfxBus);auDrum(t+.02,.06,AUD.sfxBus)} /* Legion Blade: a sword slash + steel ring + a martial drum tick */
+  else if(ty==='needle'){auTone({f:2400,f2:3200,dur:.07,vol:.035,type:'sine'});auNoise({dur:.02,vol:.04,f:3600,type:'highpass',at:t+.06})} /* Cardinal Needle: a thin pin whistle + the pin striking home */
   else if(ty==='summonwolf'){auTone({f:380,f2:660,dur:.22,vol:.045});auTone({f:660,f2:450,dur:.28,vol:.04,at:t+.2})} /* a distant answering howl contour */
-  else if(ty==='summonskel'||ty==='corpse'){for(let i=0;i<4;i++)auNoise({dur:.035,vol:.06,at:t+i*.045+R()*.02,f:2100,type:'highpass'});if(ty==='corpse'){thump(105,36,.3,.17);auNoise({dur:.22,vol:.11,f:550,f2:130})}} /* bones knitting / a body bursting */
+  else if(ty==='corpse'){for(let i=0;i<4;i++)auNoise({dur:.035,vol:.06,at:t+i*.045+R()*.02,f:2100,type:'highpass'});thump(105,36,.3,.17);auNoise({dur:.22,vol:.11,f:550,f2:130})} /* a body bursting (summonskel is gone with the dead branches — the corpse branch is the live one) */
   else if(ty==='poisonnova'){for(let i=0;i<4;i++)auNoise({dur:.09,vol:.045,at:t+i*.055,f:900,f2:300});auNoise({dur:.3,vol:.05,f:750,f2:260})}
-  else if(ty==='holyfire'||ty==='hammer'||ty==='judge'){auBell(523,1.3,.05,t,AUD.sfxBus);auNoise({dur:.2,vol:.035,f:600,f2:1800,type:'bandpass'});if(ty==='judge')auBell(392,2,.07,t+.06,AUD.sfxBus)} /* chapel iron, not a synth chord */
-  else if(ty==='tartrap'||ty==='shivs'||ty==='contract'){auNoise({dur:.15,vol:.07,f:550,f2:180});thump(150,65,.15,.05)}
-  else if(ty==='multishot'||ty==='explosive'||ty==='bfa'){swish(750,2200,.12,.085);if(ty!=='multishot'){auNoise({dur:.16,vol:.07,at:t+.03,f:500,f2:150});thump(90,45,.16,.07)}}
+  else if(ty==='hammer'){auBell(523,1.3,.05,t,AUD.sfxBus);auNoise({dur:.2,vol:.035,f:600,f2:1800,type:'bandpass'})} /* chapel iron, not a synth chord (holyfire/judge are gone with the dead branches) */
+  else if(ty==='bfa'){swish(750,2200,.12,.085);auNoise({dur:.16,vol:.07,at:t+.03,f:500,f2:150});thump(90,45,.16,.07)} /* the colossal arrow (multishot/explosive are gone with the dead branches) */
   else{swish(500,1500,.11,.04);auPluck(220+R()*60,{at:t,dur:.5,vol:.03})} /* a muttered word + cloth */
   break}
  case 'death':{const f=o.fam;
@@ -566,21 +673,33 @@ function sfx(kind,o){
   else if(f==='Knight'){auMetal(820,.3,.06,t,AUD.sfxBus);auNoise({dur:.1,vol:.07,f:1500,type:'highpass'});thump(75,36,.22,.11)} /* armour hitting stone */
   else{auNoise({dur:.1,vol:.07,f:800,f2:250});thump(190,95,.12,.06)}
   break}
- case 'gem':auMetal(2350,.07,.022,t,AUD.sfxBus);auNoise({dur:.02,vol:.02,f:3000,type:'highpass'});break; /* a gem settling into the pouch — a click, not a chime */
- case 'gold':auMetal(3100,.06,.03,t,AUD.sfxBus);if(R()<.7)auMetal(3900,.07,.022,t+.045+R()*.02,AUD.sfxBus);break; /* coins, irregular */
- case 'loot':{const r=o.rarity||'Common';
-  thump(140,70,.09,.07);auNoise({dur:.05,vol:.05,f:600,f2:250}); /* something heavy leaves the world and lands */
-  if(r==='Rare')auBell(392,1.1,.035,t+.07,AUD.sfxBus);
-  else if(r!=='Common'&&r!=='Magic')auBell(330,1.6,.05,t+.07,AUD.sfxBus); /* better finds toll once, low */
-  else if(r==='Magic')auMetal(1900,.12,.02,t+.05,AUD.sfxBus);
+ case 'gem':{const tier=o.tier||1; /* v145: tier-DISTINCT chimes, short and bright, ~3x louder than the old .022 click — 1 XP one note, 5 XP two rising, 25 XP three + a bell. 'gem' is AU_IMPORTANT now and every layer here is imp, so the most-repeated interaction in the game is never dropped under load */
+  if(tier>=25){auMetal(1568,.14,.06,t,AUD.sfxBus);auMetal(2093,.16,.05,t+.05,AUD.sfxBus);auMetal(2637,.2,.045,t+.1,AUD.sfxBus);auTone({f:1318,dur:.22,vol:.03,at:t,type:'triangle',imp:1,verb:1})}
+  else if(tier>=5){auMetal(1318,.12,.055,t,AUD.sfxBus);auMetal(1760,.14,.05,t+.05,AUD.sfxBus)}
+  else auMetal(1568,.1,.05,t,AUD.sfxBus);
   break}
- case 'fanfare': /* LEGENDARY: a low toll, a drum, and the drone swelling — awe, not a jingle */
+ case 'gold':auMetal(3100,.07,.045,t,AUD.sfxBus);auMetal(3900,.08,.04,t+.05,AUD.sfxBus);if(R()<.5)auMetal(4700,.06,.03,t+.1,AUD.sfxBus);break; /* coins, irregular — brighter than gems, and two strikes where a gem is one */
+ case 'evogrant': /* EVOLUTION GRANT (v145, was the shared 'fanfare'): the evolution keeps its plucked-run identity — a rising major run, brighter and faster than the ceremony's 'evolve' sting, topped with a bell */
+  [0,4,7,12,16,19].forEach(function(st,i){auPluck(220*Math.pow(2,st/12),{at:t+i*.055,dur:1,vol:.06,bus:AUD.sfxBus,imp:1})});
+  auBell(880,1.4,.04,t+.34,AUD.sfxBus);thump(72,44,.4,.07);break;
+ case 'pairchime': /* PAIR COMPLETION (v145, was the shared 'fanfare'): a bright chime — high triangle bells in a rising arpeggio */
+  [1046,1318,1568,2093].forEach(function(f,i){auTone({f:f,dur:.5,vol:.045,at:t+i*.07,bus:AUD.sfxBus,type:'triangle',a:.01,imp:1,echo:1,verb:1})});break;
+ case 'relic': /* RELIC (v145): the old 'fanfare' body — the low toll stays with the Relic, the one milestone it always fit. A low toll, a drum, and the drone swelling — awe, not a jingle */
   auBell(196,2.6,.1,t,AUD.sfxBus);auBell(147,3,.07,t+.22,AUD.sfxBus);
   auDrum(t+.05,.14,AUD.sfxBus);auBowed(98,1.6,.05,t,AUD.sfxBus);
   auNoise({dur:.35,vol:.08,f:380,f2:90,imp:1});thump(62,36,.55,.13);break;
- case 'level':{ /* LEVEL UP (v122 — TONED-DOWN ARCADE 3, the design Zachery approved from the chime-arcade-3-toned-down sample; REPLACES the v121 casino coin cascade outright — no coin cascade, no tray thud, no plucked anchor): TRIANGLE BELLS carry a C-major chord — C5 523Hz, E5 659Hz, G5 784Hz — struck together with a SOFT attack (25ms ramp, vs the engine's usual 8ms) and a ~1.15s ring, DOMINANT in the mix; over them a QUIET SQUARE-WAVE SPARKLE arpeggio of exactly THREE notes — 1046, 1318, 1568Hz — staggered ~0.08s apart and mixed low (~0.15 layer), far quieter than the v121 casino sparkle. Overall level sits ~20% BELOW the original Arcade 3 take (bell vol .068). All synthesised on the SFX bus, so master / SFX volume and mute apply exactly as before, and 'level' stays AU_IMPORTANT so the voice cap never drops it. Total span ~1.2s — inside the 1.5s cap — so ~50 level-ups a run stay gentle. */
+ case 'winfanfare': /* 30:00 WIN (v145, was the shared 'fanfare'): a full fanfare that sounds like a WIN — rising bells, drums, a major plucked run and a bowed swell */
+  [0,4,7,12].forEach(function(st,i){auBell(262*Math.pow(2,st/12),1.8,.05,t+i*.12,AUD.sfxBus)});
+  [0,4,7,12,16,19,24].forEach(function(st,i){auPluck(262*Math.pow(2,st/12),{at:t+.1+i*.07,dur:1.2,vol:.055,bus:AUD.sfxBus,imp:1})});
+  auDrum(t,.16,AUD.sfxBus);auDrum(t+.5,.13,AUD.sfxBus);auBowed(131,2.2,.05,t,AUD.sfxBus);thump(58,34,.7,.12);break;
+ case 'level':{ /* LEVEL UP (v122 — TONED-DOWN ARCADE 3, the design Zachery approved from the chime-arcade-3-toned-down sample; REPLACES the v121 casino coin cascade outright — no coin cascade, no tray thud, no plucked anchor): TRIANGLE BELLS carry a C-major chord — C5 523Hz, E5 659Hz, G5 784Hz — struck together with a SOFT attack (25ms ramp, vs the engine's usual 8ms) and a ~1.15s ring, DOMINANT in the mix; over them a QUIET SQUARE-WAVE SPARKLE arpeggio of exactly THREE notes — 1046, 1318, 1568Hz — staggered ~0.08s apart and mixed low (~0.15 layer), far quieter than the v121 casino sparkle. Overall level sits ~20% BELOW the original Arcade 3 take (bell vol .068). All synthesised on the SFX bus, so master / SFX volume and mute apply exactly as before, and 'level' stays AU_IMPORTANT so the voice cap never drops it. Total span ~1.2s — inside the 1.5s cap — so ~50 level-ups a run stay gentle. v145 ESCALATION (the approved chime is NOT replaced — it grows): a soft rising whoosh leads it in (the VS whoosh-and-chime pair, timed to the screen flash), the sparkle notes vary a few cents per play, and every 10 levels the sparkle gains one higher note (2093 at Lv 10, 2637 at Lv 20, 3136 at Lv 30) — level 45 no longer sounds like level 2. */
+  swish(600,2400,.18,.02); /* the whoosh lead-in */
   [523,659,784].forEach(function(f){auTone({f:f,dur:1.15,vol:.068,at:t,bus:AUD.sfxBus,type:'triangle',a:.025,imp:1,echo:1,verb:1})}); /* the bells: one C-major chord, triangle wave, soft attack */
-  [1046,1318,1568].forEach(function(f,i){auTone({f:f,dur:.34,vol:.02,at:t+.07+i*.08,bus:AUD.sfxBus,type:'square',a:.012,imp:1})}); /* the sparkle: three square-wave notes only, staggered 0.08s, quiet under the bells */
+  [1046,1318,1568].forEach(function(f,i){auTone({f:f*(1+(R()-.5)*.004),dur:.34,vol:.02,at:t+.07+i*.08,bus:AUD.sfxBus,type:'square',a:.012,imp:1})}); /* the sparkle: three square-wave notes only, staggered 0.08s, quiet under the bells */
+  const _lv=(typeof player!=='undefined'&&player&&player.level)||1;
+  if(_lv>=10)auTone({f:2093,dur:.3,vol:.016,at:t+.31,bus:AUD.sfxBus,type:'square',a:.012,imp:1});
+  if(_lv>=20)auTone({f:2637,dur:.3,vol:.014,at:t+.39,bus:AUD.sfxBus,type:'square',a:.012,imp:1});
+  if(_lv>=30)auTone({f:3136,dur:.34,vol:.013,at:t+.47,bus:AUD.sfxBus,type:'square',a:.012,imp:1});
   break}
  case 'reeltick':auMetal(4300+R()*500,.03,.016,t,AUD.sfxBus);auNoise({dur:.018,vol:.02,f:3400,type:'highpass',at:t});break; /* BOSS-CHEST reels only (v122): one tick as an empty chest reel stops — the level-up path no longer uses any reel tick */
  case 'reelstop':auMetal(3900,.04,.022,t,AUD.sfxBus);auNoise({dur:.05,vol:.05,f:700,f2:240,at:t});thump(190,95,.06,.06);auMetal(3100+R()*600,.07,.02,t+.055,AUD.sfxBus);break; /* BOSS-CHEST reels only (kept separate from the level-up path, as in v121): a prize reel slamming home — tick, clunk, one coin glint */
@@ -592,20 +711,44 @@ function sfx(kind,o){
   if(_el==='light')for(let i=0;i<3;i++)auNoise({dur:.03,vol:.05,f:3300,type:'highpass',at:t+.1+i*.05,imp:1});
   if(_el==='poison'||_el==='nature')auNoise({dur:.25,vol:.04,f:700,f2:250,at:t});
   thump(64,40,.45,.09);break}
- case 'whoosh':auNoise({dur:.38,vol:.12,f:260,f2:2500,type:'bandpass',q:1.3,imp:1});break; /* the siege arrow's air */
+ case 'pentwipe':auBell(98,2.8,.11,t,AUD.sfxBus);auBell(65,3.2,.09,t+.12,AUD.sfxBus);auDrum(t,.17,AUD.sfxBus);thump(52,28,.8,.15);for(let i=0;i<5;i++)auNoise({dur:.03,vol:.05,at:t+.15+i*.06+R()*.02,f:3300,type:'highpass'});auNoise({dur:.6,vol:.08,f:900,f2:200,imp:1});break; /* v145: the Corpse Charge screen WIPE — a dark double toll, a deep boom and shattering glass. Its own sound at last: it used to borrow the 'evolve' sting */
+ case 'whoosh':auNoise({dur:.38,vol:.12,f:260,f2:2500,type:'bandpass',q:1.3,imp:1});break; /* the siege arrow's air — the Marrow Bow's BFA alone now; Needle, Rune and Frostbite got their own flight sounds below */
+ case 'needleshot':auTone({f:2600,f2:3400,dur:.06,vol:.03,type:'sine'});auNoise({dur:.02,vol:.035,f:3800,type:'highpass',at:t+.05});break; /* v145: a needle flying — a thin whistle + the pin striking home (was the shared 'whoosh') */
+ case 'needlerain':for(let i=0;i<6;i++)auTone({f:2800-i*220,f2:2000-i*180,dur:.09,vol:.025,type:'sine',at:t+i*.05});break; /* v145: Cardinal Rain — needles falling from the sky, a descending shimmer (was the shared 'whoosh') */
+ case 'runefly':auMetal(2400,.12,.03,t,AUD.sfxBus);auTone({f:1900,f2:2900,dur:.09,vol:.028,type:'sine',at:t+.05});break; /* v145: a rune diamond ricocheting — crystal + a rising ping (was the shared 'whoosh') */
+ case 'freezeblast':auNoise({dur:.5,vol:.07,f:1800,f2:400,type:'bandpass'});auMetal(3600,.12,.014,t+.05,AUD.sfxBus);break; /* v145: the freeze beam sweeping out — cold wind + ice glitter (was the shared 'whoosh') */
  case 'streak':auDrum(t,.1,AUD.sfxBus);auPluck(196,{at:t+.05,dur:1.2,vol:.07,bus:AUD.sfxBus,imp:1});auPluck(294,{at:t+.16,dur:1.2,vol:.06,bus:AUD.sfxBus,imp:1});break;
  case 'rune':auBell(131,2.8,.1,t,AUD.sfxBus);auNoise({dur:.3,vol:.03,f:500,f2:150,at:t+.05});break; /* stone remembering a word */
- case 'chest':auNoise({dur:.3,vol:.07,f:300,f2:90});auMetal(1500,.08,.03,t+.14,AUD.sfxBus);auMetal(3100,.06,.02,t+.3,AUD.sfxBus);if(R()<.6)auMetal(3700,.06,.016,t+.38,AUD.sfxBus);break; /* wood giving, iron latch, coins shifting */
+ case 'chest':{ /* v145 CHEST SEQUENCE (the VS payoff): the music CUTS OUT entirely for the sequence (musCutUntil — musicTick holds the music bus at 0 until it passes, then fades back in), then a two-part jingle plays — a "Treasure Found" sting, then a reveal jingle keyed to the chest's tier (1/3/5 reels) and silver/bronze. The reel ticks keep their own sound. The wood + latch stay as the first beat */
+  const tier=o.tier||1,silver=!!o.silver;
+  AUD.musCutUntil=t+(silver?3.5:(tier>=5?3.2:tier>=3?2.6:2.1));
+  auNoise({dur:.3,vol:.07,f:300,f2:90});auMetal(1500,.08,.03,t+.14,AUD.sfxBus);auMetal(3100,.06,.02,t+.3,AUD.sfxBus);if(R()<.6)auMetal(3700,.06,.016,t+.38,AUD.sfxBus); /* wood giving, iron latch, coins shifting */
+  /* part 1 — "Treasure Found": a rising plucked sting + a bell */
+  [0,4,7,12].forEach(function(st,i){auPluck(330*Math.pow(2,st/12),{at:t+.45+i*.07,dur:1,vol:.06,bus:AUD.sfxBus,imp:1})});
+  auBell(659,1.2,.04,t+.75,AUD.sfxBus);
+  /* part 2 — the reveal, keyed to the prize count: 1 reel a short chime, 3 a longer one, 5 the full cascade; silver adds a low bell + drum */
+  const rev=tier>=5?[1046,1175,1318,1568,1760,2093,2637]:tier>=3?[1046,1318,1568,1760,2093]:[1046,1318,1760];
+  rev.forEach(function(f,i){auTone({f:f,dur:.4,vol:.04,at:t+1.05+i*.09,bus:AUD.sfxBus,type:'triangle',a:.01,imp:1,echo:1,verb:1})});
+  if(silver){auBell(131,2.4,.09,t+1.05,AUD.sfxBus);auDrum(t+1.05,.13,AUD.sfxBus)}
+  break}
+ case 'chestdrop':thump(120,50,.22,.13);auMetal(3100,.07,.03,t+.12,AUD.sfxBus);auBell(262,1.4,.04,t+.15,AUD.sfxBus);break; /* v145: a boss chest DROPPING where a mini-boss fell — a heavy thud + coin glint + one bell. Not the chest-open sequence: the chest is on the ground, unopened */
+ case 'magnet':{ /* v145: a magnet VACUUM — a rising bandpass suck + a low pull, ending in a gem-ish glint as the field scoops in. Never the chest sound again */
+  auNoise({dur:.5,vol:.09,f:300,f2:2400,type:'bandpass',q:1.4});
+  auTone({f:180,f2:60,dur:.45,vol:.08,type:'sine'});
+  auMetal(2093,.14,.04,t+.42,AUD.sfxBus);auMetal(2637,.16,.035,t+.5,AUD.sfxBus);break}
+ case 'magnetdrop':auMetal(880,.12,.04,t,AUD.sfxBus);auTone({f:110,f2:90,dur:.3,vol:.06,type:'sine',at:t+.03});break; /* v145: a magnet DROPPING — a soft magnetic clink + a low hum pulse. Not the rune bell (that stays with the secret room) */
  case 'potion':[0,.09,.19].forEach(function(off,i){auTone({f:300+i*70,f2:380+i*80,dur:.08,vol:.04,at:t+off})});auNoise({dur:.14,vol:.025,f:800,f2:1500,at:t+.04});break; /* glug, glug, glug */
- case 'equip':auNoise({dur:.05,vol:.07,f:900,f2:300});auMetal(1350,.09,.028,t+.03,AUD.sfxBus);thump(160,90,.06,.05);break; /* leather + clasp */
+ case 'heart':auPluck(523,{at:t,dur:.8,vol:.05,bus:AUD.sfxBus,imp:1});auPluck(784,{at:t+.08,dur:.9,vol:.045,bus:AUD.sfxBus,imp:1});auBell(1046,1.1,.03,t+.14,AUD.sfxBus);break; /* v145: a heart heal — a warm major lift, not a potion glug */
  case 'buy':auMetal(2900,.06,.03,t,AUD.sfxBus);auMetal(3600,.07,.024,t+.05,AUD.sfxBus);break;
  case 'ui':auNoise({dur:.03,vol:.035,f:1100,f2:500});auTone({f:210,f2:150,dur:.04,vol:.02});break; /* a wooden toggle, not a beep */
  case 'hurt':auNoise({dur:.08,vol:.07,f:650,f2:220});thump(165,80,.1,.1);break;
- case 'elite':auBowed(110,0.7,.06,t,AUD.sfxBus);auBowed(116.5,0.7,.06,t,AUD.sfxBus);auNoise({dur:.35,vol:.04,f:280,f2:800});break; /* two bowed strings a semitone apart — dread, unresolved */
  case 'boss':auDrum(t,.2,AUD.sfxBus);auDrum(t+.45,.16,AUD.sfxBus);auBell(98,3.2,.12,t+.1,AUD.sfxBus);auTone({f:56,f2:33,dur:.95,vol:.16,type:'sawtooth',imp:1});auNoise({dur:.7,vol:.11,f:450,f2:110,imp:1});break;
+ case 'miniboss':auDrum(t,.14,AUD.sfxBus);auBell(131,2.2,.08,t+.08,AUD.sfxBus);auNoise({dur:.4,vol:.06,f:350,f2:110});break; /* v145: a MINI-BOSS rises — one drum + one low bell, a smaller cue than a boss (which keeps the full two-drum + sawtooth drop) */
  case 'bosstease':auBell(165,3.6,.06,t,AUD.sfxBus);auNoise({dur:1.1,vol:.045,f:150,f2:75});break;
+ case 'banner':auBell(196,1.6,.05,t,AUD.sfxBus);auDrum(t+.02,.07,AUD.sfxBus);if(o.big){auBell(147,2.2,.06,t+.18,AUD.sfxBus);auDrum(t+.2,.09,AUD.sfxBus)}break; /* v145: minute banners finally sound — a low bell + a soft drum tick; milestone minutes (5/10/15/20/25) get the bigger variant */
  case 'roar':auTone({f:68,f2:125,dur:.5,vol:.14,type:'sawtooth',imp:1});auNoise({dur:.45,vol:.1,f:550,f2:1400});thump(80,40,.4,.08);break;
  case 'bossdie':[24,19,15,12].forEach(function(st,i){auPluck(65.4*Math.pow(2,st/12),{at:t+i*.17,dur:1.6,vol:.09,bus:AUD.sfxBus,imp:1})});auDrum(t+.1,.15,AUD.sfxBus);auBell(131,3.2,.11,t+.25,AUD.sfxBus);thump(58,28,.85,.16);break; /* the figure falls home and the bell closes it */
+ case 'reddeath':auBowed(110,1.8,.07,t,AUD.sfxBus);auBowed(116.5,1.8,.07,t,AUD.sfxBus);auBell(65,3.5,.12,t+.1,AUD.sfxBus);auTone({f:48,f2:40,dur:1.6,vol:.14,type:'sawtooth',imp:1});auNoise({dur:1.4,vol:.09,f:220,f2:60,imp:1});break; /* v145: the Red Death ARRIVES — two bowed strings a semitone apart (dread, unresolved — the dead 'elite' idea, finally used where it belongs), a deep toll and a low rumble that never resolves. Never 'bossdie' again: a resolving sound was the wrong shape for the most dreaded moment in the game */
  case 'gameover':[24,19,15,12].forEach(function(st,i){auPluck(55*Math.pow(2,st/12),{at:t+i*.3,dur:2.2,vol:.09,bus:AUD.sfxBus,imp:1})});auBell(98,3.6,.09,t+.5,AUD.sfxBus);break; /* slow, sparse, final */
  case 'bell':auBell(196,3.2,.055,t,AUD.sfxBus);break;
  case 'descend':auNoise({dur:.5,vol:.1,f:220,f2:60});thump(68,40,.45,.14);auBell(147,2.6,.05,t+.2,AUD.sfxBus);break; /* stone doors under the world */
@@ -616,7 +759,15 @@ function sfx(kind,o){
  case 'allydie':auTone({f:300,f2:100,dur:.36,vol:.06});auNoise({dur:.2,vol:.045,f:480,f2:140});break;
  case 'block':auMetal(980,.22,.07,t,AUD.sfxBus);auNoise({dur:.05,vol:.05,f:3200,type:'highpass'});break; /* shield iron rings true */
  case 'speed':auNoise({dur:.05,vol:.04,f:1300,f2:700});auPluck(520,{at:t+.02,dur:.5,vol:.035});break;
- case 'bossab':auDrum(t,.15,AUD.sfxBus);auTone({f:80,f2:44,dur:.5,vol:.13,type:'sawtooth',imp:1});auNoise({dur:.35,vol:.08,f:400,f2:120});auBell(147,2.2,.05,t+.05,AUD.sfxBus);break;
+ case 'bossab':{const ab=o.ab; /* v145: all six boss abilities get their own sound (slam/bigslam share the ground-break; the rest are distinct) */
+  if(ab==='slam'||ab==='bigslam'){thump(115,34,.32,.2);auNoise({dur:.24,vol:.13,f:480,f2:110});if(ab==='bigslam'){auDrum(t+.1,.16,AUD.sfxBus);auTone({f:56,f2:30,dur:.6,vol:.12,type:'sawtooth',imp:1})}} /* the ground breaks — Colossus Slam adds a drum + a low drop */
+  else if(ab==='nova'){auNoise({dur:.5,vol:.11,f:280,f2:1600});auDrum(t+.05,.14,AUD.sfxBus);thump(70,38,.4,.11)} /* a fire nova roaring outward */
+  else if(ab==='venom'){for(let i=0;i<4;i++)auNoise({dur:.09,vol:.05,at:t+i*.07,f:900,f2:300});auTone({f:140,f2:90,dur:.4,vol:.06,type:'sine'})} /* venom bubbling up */
+  else if(ab==='meteors'){auNoise({dur:.4,vol:.08,f:1200,f2:300,type:'bandpass'});auTone({f:900,f2:200,dur:.35,vol:.05,type:'sine'});thump(90,40,.3,.12)} /* the sky tearing — a falling whistle + the first impact */
+  else if(ab==='volley'){for(let i=0;i<3;i++)auTone({f:1200+i*300,dur:.12,vol:.03,at:t+i*.08,type:'sine',verb:1});auNoise({dur:.3,vol:.05,f:2000,f2:800,type:'bandpass'})} /* the veil gathering — a rising shimmer */
+  else if(ab==='charge'){auTone({f:68,f2:110,dur:.35,vol:.12,type:'sawtooth',imp:1});auDrum(t,.12,AUD.sfxBus);auDrum(t+.22,.1,AUD.sfxBus)} /* Gormaw pawing the ground — a growl + galloping thumps */
+  else{auDrum(t,.15,AUD.sfxBus);auTone({f:80,f2:44,dur:.5,vol:.13,type:'sawtooth',imp:1});auNoise({dur:.35,vol:.08,f:400,f2:120});auBell(147,2.2,.05,t+.05,AUD.sfxBus)} /* fallback: the old shared ability sound */
+  break}
  case 'modal':auNoise({dur:.04,vol:.03,f:800,f2:400});auTone({f:180,f2:140,dur:.05,vol:.018});break; /* parchment / wood */
  case 'modalclose':auNoise({dur:.04,vol:.026,f:700,f2:350});auTone({f:150,f2:120,dur:.05,vol:.016});break;
  default:auNoise({dur:.05,vol:.04,f:700,f2:300});
@@ -1230,7 +1381,7 @@ const RELICS=[ /* v144: the dead slot/affixes fields are stripped — nothing re
 let runDepth=1; /* deepest floor reached THIS run — reset in startGame, grown by trackDepth() */
 function currentDepth(){return 1+Math.floor((typeof elapsed!=='undefined'?elapsed:0)/60)} /* v109: DESCENT DEPTH counts MINUTES SURVIVED in the one continuous arena (there are no floors to descend) — Relics at Depth 5/10/15/20/25/30 now land at 4:00 / 9:00 / 14:00 / 19:00 / 24:00 / 29:00 of a run, the last of them a minute before the Red Death */
 function trackDepth(){const d=currentDepth();if(d>runDepth)runDepth=d;if(d>(meta.bestDepth||0))meta.bestDepth=d;checkRelics()}
-function checkRelics(){RELICS.forEach(R=>{if(runDepth>=R.depth&&!(meta.relics&&meta.relics[R.id])){if(!meta.relics)meta.relics={};meta.relics[R.id]=R.depth;saveAll();try{sfx('fanfare');showFanfare({rarity:'Relic',name:R.name})}catch(e){}showToast('DESCENT RELIC EARNED — '+R.name+' (Depth '+R.depth+') — a permanent power now, no item to fit or lose')}})}
+function checkRelics(){RELICS.forEach(R=>{if(runDepth>=R.depth&&!(meta.relics&&meta.relics[R.id])){if(!meta.relics)meta.relics={};meta.relics[R.id]=R.depth;saveAll();try{sfx('relic');showFanfare({rarity:'Relic',name:R.name})}catch(e){}showToast('DESCENT RELIC EARNED — '+R.name+' (Depth '+R.depth+') — a permanent power now, no item to fit or lose')}})}
 /* skill type -> route key (basic attack route is 'basic'): castSkill routes per-skill percentages by it */
 const TYPE_BRANCH={whirl:'s1',slam:'s2',rage:'s3',fireball:'s1',chain:'s2',blizzard:'s3',summonwolf:'s1',summonskel:'s1',corpse:'s2',poisonnova:'s3',holyfire:'s1',hammer:'s2',judge:'s3',ember:'s3',multishot:'s1',explosive:'s2',bfa:'s3',tartrap:'s1',shivs:'s2',contract:'s3',breath:'s1',choir:'s3',roar:'s3',napalm:'s1',flamewall:'s2',fuelburst:'s3',flail:'s1',orbit:'s1'};
 /* =====================================================================
@@ -1991,7 +2142,7 @@ function evoCeremony(ev){const p=player;if(!p||!ev)return;const col=(p.cls&&p.cl
    plays above the modal, on the live game. A pending pair fanfare
    sequences 1.6s behind it. */
 function firePendingEvoCeremony(){if(!pendingEvoCeremony)return;const _ev=pendingEvoCeremony;pendingEvoCeremony=null;evoCeremony(_ev);if(pendingPairFanfare)setTimeout(()=>{if(state==='play')firePendingPairFanfare()},1600)}
-function firePendingPairFanfare(){if(!pendingPairFanfare)return;const _pf=pendingPairFanfare;pendingPairFanfare=null;const p=player;const _fx=ui('evoFx');if(_fx){const _b=_fx.querySelector('.evoBig');if(_b)_b.textContent='PAIR COMPLETE';const _n=ui('evoName');if(_n)_n.textContent=_pf.name;const _s=ui('evoSkill');if(_s)_s.textContent=_pf.weapon+' + its sigil — claim it from a silver boss chest';_fx.style.setProperty('--evocol','#ffd94a');_fx.classList.remove('show');void _fx.offsetWidth;_fx.classList.add('show');clearTimeout(evoBannerTimer);evoBannerTimer=setTimeout(()=>{_fx.classList.remove('show');if(_b)_b.textContent='EVOLUTION'},1400)}sfx('fanfare');if(p){const _gi=p.skills.findIndex(s=>s.wid===_pf.wid);if(_gi>=0){evoGlowIdx=_gi;evoGlowUntil=performance.now()+2600;renderHotbar()}}} /* v144 PAIR FANFARE: when a weapon reaches Lv 8 with its paired passive held, the pair completes — a gold PAIR COMPLETE banner names the evolution and the hotbar slot glows. Starter-weapon pairs get no hotbar glow (the basic has no skill entry) */
+function firePendingPairFanfare(){if(!pendingPairFanfare)return;const _pf=pendingPairFanfare;pendingPairFanfare=null;const p=player;const _fx=ui('evoFx');if(_fx){const _b=_fx.querySelector('.evoBig');if(_b)_b.textContent='PAIR COMPLETE';const _n=ui('evoName');if(_n)_n.textContent=_pf.name;const _s=ui('evoSkill');if(_s)_s.textContent=_pf.weapon+' + its sigil — claim it from a silver boss chest';_fx.style.setProperty('--evocol','#ffd94a');_fx.classList.remove('show');void _fx.offsetWidth;_fx.classList.add('show');clearTimeout(evoBannerTimer);evoBannerTimer=setTimeout(()=>{_fx.classList.remove('show');if(_b)_b.textContent='EVOLUTION'},1400)}sfx('pairchime');if(p){const _gi=p.skills.findIndex(s=>s.wid===_pf.wid);if(_gi>=0){evoGlowIdx=_gi;evoGlowUntil=performance.now()+2600;renderHotbar()}}} /* v144 PAIR FANFARE: when a weapon reaches Lv 8 with its paired passive held, the pair completes — a gold PAIR COMPLETE banner names the evolution and the hotbar slot glows. Starter-weapon pairs get no hotbar glow (the basic has no skill entry) */
 /* ---------------- LEVEL-UP moment (visual half of the fanfare) -------
    Fired by levelUp() alongside sfx('level'), once per level gained
    (queued double level-ups each get their own). Layers, so the moment
@@ -2169,7 +2320,7 @@ function openSlotChest(ch){const p=player;if(!p)return;
  const silver=!ch.mini&&elapsed>=600; /* v128 SILVER CHESTS: only boss chests opened at 10:00+ can evolve — mini-boss chests and pre-10:00 boss chests are bronze: levels + gold only, never an evolution */
  const ready=readyEvolutions(p);
  if(silver&&ready.length){const {w,def}=ready[0];w.evo=true; /* v128 ONE EVOLUTION PER CHEST (VS rule) — the first ready weapon evolves; the rest wait for the next chest. The paired passive STAYS HELD (v127) — it keeps working and can still gain levels; the evolution gate still requires it to be held. */
-  recordBuildDiscovery('e',w.id);gained.push('◆ EVOLUTION — '+def.name+' evolved into <b class="c-evo">'+def.evo+'</b>');sfx('fanfare');pendingEvoCeremony={flag:'wep_'+w.id,name:def.evo,skill:def.name,type:def.engine}; /* v144: the ceremony is QUEUED, not fired — it plays after the modal closes (see firePendingEvoCeremony), so its canvas layers show above the chest instead of under it */
+  recordBuildDiscovery('e',w.id);gained.push('◆ EVOLUTION — '+def.name+' evolved into <b class="c-evo">'+def.evo+'</b>');sfx('evogrant');pendingEvoCeremony={flag:'wep_'+w.id,name:def.evo,skill:def.name,type:def.engine}; /* v144: the ceremony is QUEUED, not fired — it plays after the modal closes (see firePendingEvoCeremony), so its canvas layers show above the chest instead of under it */
   if(!p.evoBonusPaid)p.evoBonusPaid={};if(!p.evoBonusPaid[w.id]){p.evoBonusPaid[w.id]=1;const _bg=Math.round(500*(p.goldBonus||1));gold+=_bg;gained.push(iconImg('gem','glyphic')+'First evolution of '+def.name+' — +'+_bg+' gold')} /* v128 VS: each weapon's first evolution pays a one-time +500g bonus */
   if(ready.length>1)gained.push('<span class="small">'+(ready.length-1)+' more evolution'+(ready.length>2?'s':'')+' ready — the next chest claims the next one</span>')}
  else if(ready.length&&!silver)gained.push('<span class="small">'+ready.length+' evolution'+(ready.length>1?'s':'')+' ready — but this chest is bronze; a silver boss chest (10:00+) claims it</span>');
@@ -2181,7 +2332,7 @@ function openSlotChest(ch){const p=player;if(!p)return;
  const spinNames=[];(p.weapons||[]).forEach(w=>{const d=weaponById(w.id);if(d)spinNames.push(w.evo?d.evo:d.name)});(p.passives||[]).forEach(x=>{const d=passiveById(x.id);if(d)spinNames.push(d.name)});if(!spinNames.length)spinNames.push('—');
  const reelHTML=Array.from({length:tier},(_,i)=>i).map(i=>'<div class="slotreel rolling" id="slotReel'+i+'"><div class="slotlab">REEL '+(i+1)+'</div><div class="slotname">◆ ◆ ◆</div><div class="slotlvl"></div></div>').join('');
  showModal('<h1>'+iconImg('chest','shopic')+(silver?'SILVER BOSS':ch.mini?'MINI-BOSS (BRONZE)':'BRONZE BOSS')+' CHEST — '+(ch.bossName||'FELLED')+'</h1>'+(gained.length?'<p>'+gained.join('<br>')+'</p>':'')+'<p class="small">'+tier+' reel'+(tier>1?'s':'')+' — each raises a different held piece +1 · pays '+tier+' level'+(tier>1?'s':'')+' + '+chestGold+' gold</p><div class="slotwrap">'+reelHTML+'</div><p class="small" id="slotMsg">The reels are spinning…</p><div class="row"><button id="slotOk" type="button" style="display:none">Continue</button></div>'); /* v111: the repeated evoProgressHTML block and the long slot-machine intro are deleted here too — the reels already read name + Lv n → Lv n+1 */
- sfx('chest');
+ sfx('chest',{silver,tier}); /* v145: the chest sequence is keyed to the chest's tier (1/3/5 reels) and silver/bronze — see the 'chest' case */
  const timers=[];
  const stopReel=i=>{const reel=ui('slotReel'+i);if(!reel)return;const nm=reel.querySelector('.slotname'),lv=reel.querySelector('.slotlvl');reel.classList.remove('rolling');const pk=picks[i];
   if(pk){pk.o.lvl++;recalc(p);syncHud(true);renderHotbar();if(pk.def&&pk.def.passive&&pk.o.lvl===8&&!pk.o.evo&&heldPassiveLvl(p,pk.def.passive)>0)pendingPairFanfare={name:pk.def.evo,weapon:pk.def.name,wid:pk.def.id};reel.classList.add('stopped');if(nm)nm.textContent=(pk.def?pk.def.name:'Build piece');if(lv)lv.textContent='Lv '+(pk.o.lvl-1)+' → Lv '+pk.o.lvl;sfx('reelstop')} /* v121: a prize reel slams home (tick + clunk + coin glint). v144: a reel raising a weapon to Lv 8 with its paired passive held completes the pair */
@@ -2199,7 +2350,7 @@ function weaponTick(dt){const p=player;if(!p||!p.weapons)return;
  const fl=findWeapon(p,'graveflail');
  if(fl){p.flailCd=(p.flailCd||0)-dt;const range=165*(p.aoeMul||1)*Math.pow(1.1,cntAt(wlvl('graveflail'),[3,6,8])); /* v130 AXE: sweep range +10% at L3/L6/L8 */let tgt=null,bd=1e18;for(const e of enemies){if(e.dead)continue;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<range+46&&d<bd){bd=d;tgt=e}}
   if(p.flailCd<=0&&(tgt||!!fl.evo)){p.flailCd=1.5*Math.max(.6,(p.cdMul||1)); /* v130: the 0.4s no-cooldown swing is GONE - Doomflail swings at the normal 1.5s cadence, full circle */ /* v127 DOOMFLAIL BREAKER: the flail NEVER STOPS — it swings every 0.4s whether a foe is in reach or not (v116 FIX 5: the non-evolved swing timer still reads cdMul like every castSkill cooldown) */ /* v144: the floor re-anchors to 0.6 — the old effective floor was already 0.6 (the 40% reduction cap in recalc), so the 0.5 here never bound; behaviour is byte-identical */const ang=tgt?Math.atan2(tgt.y-p.y,tgt.x-p.x):(p.face<0?Math.PI:0),evo=!!fl.evo,arc=evo?Math.PI*2:2.6;let dmg=p.damage*weaponDmgMul(fl)*1.5;const _fc=wCritFor('graveflail');let _fcCrit=false;if(_fc&&Math.random()<Math.min(.70,p.crit+_fc.ch)){_fcCrit=true;dmg=dmg*_fc.mult/(1+(p.critDmg||.5))} /* v133: Axe twin base crit 30% 2x, rolled once per swing — the falling axes inherit the swing's crit-scaled damage */
-   fx.push({type:'slash',x:p.x,y:p.y,ang,range,arc,col:'#ffe9a8',t:0,dur:.26,kind:'cleave'});sfx('swing',{cls:p.class});
+   fx.push({type:'slash',x:p.x,y:p.y,ang,range,arc,col:'#ffe9a8',t:0,dur:.26,kind:'cleave'});sfx('cast',{type:'flail'});
    enemies.slice().forEach(e=>{if(e.dead)return;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<range+e.r&&(evo||Math.abs(angDiff(Math.atan2(e.y-p.y,e.x-p.x),ang))<arc/2)){damageEnemy(e,dmg,'phys',_fcCrit);if(!e.dead){const ka=Math.atan2(e.y-p.y,e.x-p.x);if(evo){e.kx=(e.kx||0)+Math.cos(ka)*190*(p.kbMul||1)*(KBRES[e.type]??1);e.ky=(e.ky||0)+Math.sin(ka)*110*(p.kbMul||1)*(KBRES[e.type]??1)}else{ /* v130: the drag-in is GONE - Death Spiral knocks outward like the base flail */e.kx=(e.kx||0)+Math.cos(ka)*190*(p.kbMul||1)*(KBRES[e.type]??1);e.ky=(e.ky||0)+Math.sin(ka)*110*(p.kbMul||1)*(KBRES[e.type]??1)}}}});
    pixelBurst(p.x+Math.cos(ang)*range*.6,p.y+Math.sin(ang)*range*.6,7,'#c9b18a');
    if(!evo){const _fLvl=wlvl('graveflail'),_axN=cntAt(_fLvl,[2,5]),_axR=cntAt(_fLvl,[4,7])>0?40:16; /* v133: the evolved Doomflail's falling axes are GONE — the persistent orbit replaces them; the base flail still drops +1 axe at L2/L5, bursting in 40px at L4/L7 */
@@ -2217,14 +2368,14 @@ function weaponTick(dt){const p=player;if(!p||!p.weapons)return;
   p.wispN=wn;p.wispR=R;p.wispEvo=!!wl.evo; /* v114: the draw pass renders REAL orbiting wisp sprites from this state — the Lantern is visible now (it was only these motes before) */
   if(!lowFx){p.wispTrailT=(p.wispTrailT||0)-dt;if(p.wispTrailT<=0){p.wispTrailT=.09;for(let wi=0;wi<wn;wi++){const wa=p.wispA+wi*(Math.PI*2/wn);spawnP(p.x+Math.cos(wa)*R,p.y+Math.sin(wa)*R*.82,{vx:rand(-4,4),vy:-8,life:.3,max:.3,color:'#ffd94a',size:3,shape:'pixel',grav:-6})}}} /* additive mote trail behind each wisp — pooled, accumulator-throttled, OFF in lowFx; the orbs themselves always draw (v143: square pixels, on the sim angle) */ /* v144: the trail is GOLD at every level (was ice-blue until evolved) */
   p._wispPulseT=Math.max(0,(p._wispPulseT||0)-dt); /* v135: the wisp tick ring pulses at most every 0.5s, so the evolved 0.08s sear never floods the fx pool */
-  if(p.orbitT<=0){p.orbitT=wl.evo?0.08:(_wlL>=7?.32:_wlL>=4?.38:.45)*Math.max(.6,(p.cdMul||1)); /* v130: sear tick 0.45s -> 0.38s at L4 -> 0.32s at L7 */ /* v127 UNHOLY VESPERS BREAKER: the wisps NEVER REST — they sear continuously (0.08s ticks instead of 0.45s) (v116 FIX 5: the non-evolved sear tick still reads cdMul) */ /* v144: the floor re-anchors to 0.6 (the old effective floor was already 0.6 — byte-identical) */const dmg=p.damage*weaponDmgMul(wl)*.6;enemies.slice().forEach(e=>{if(!e.dead&&Math.hypot(e.x-p.x,e.y-p.y)<R+e.r){damageEnemy(e,dmg,'spell',undefined,true);if(wl.evo&&!e.dead)applyBurn(e,effDamage(.22,'fire'),2.5)}});if(p._wispPulseT<=0){p._wispPulseT=.5;ringFx(p.x,p.y,R,'#ffd94a')}}} /* v126 UNHOLY VESPERS: seared foes also burn */ /* v135: each sear tick lands a faint ring pulse at the orbit radius — the tick itself is visible */ /* v144: the sear ring is GOLD at every level */ /* v133 FIX: the last brace used to close weaponTick here — it now stays open so the Ember Shroud / Festive Winds / Infinite Corridor blocks below are inside it */
+  if(p.orbitT<=0){p.orbitT=wl.evo?0.08:(_wlL>=7?.32:_wlL>=4?.38:.45)*Math.max(.6,(p.cdMul||1)); /* v130: sear tick 0.45s -> 0.38s at L4 -> 0.32s at L7 */ /* v127 UNHOLY VESPERS BREAKER: the wisps NEVER REST — they sear continuously (0.08s ticks instead of 0.45s) (v116 FIX 5: the non-evolved sear tick still reads cdMul) */ /* v144: the floor re-anchors to 0.6 (the old effective floor was already 0.6 — byte-identical) */const dmg=p.damage*weaponDmgMul(wl)*.6;enemies.slice().forEach(e=>{if(!e.dead&&Math.hypot(e.x-p.x,e.y-p.y)<R+e.r){damageEnemy(e,dmg,'spell',undefined,true);if(wl.evo&&!e.dead)applyBurn(e,effDamage(.22,'fire'),2.5)}});if(p._wispPulseT<=0){p._wispPulseT=.5;ringFx(p.x,p.y,R,'#ffd94a');sfx('cast',{type:'orbit'})}}} /* v126 UNHOLY VESPERS: seared foes also burn */ /* v135: each sear tick lands a faint ring pulse at the orbit radius — the tick itself is visible */ /* v144: the sear ring is GOLD at every level */ /* v145: the pulse is AUDIBLE now — a soft chiming shimmer at most every 0.5s (the Lantern never auto-casts, so its 'orbit' cast sound fires here, on the visible pulse) */ /* v133 FIX: the last brace used to close weaponTick here — it now stays open so the Ember Shroud / Festive Winds / Infinite Corridor blocks below are inside it */
  /* v133 EMBER SHROUD (VS Garlic): a 360-degree fire aura — no cone, no aiming. Ticks once a second, searing every foe inside the radius for the weapon's flat damage and stacking Burning; the evolved Furnace Shroud is wider, knocks foes back, and leeches through the shared sustain budget. */
  const _sh=findWeapon(p,'embershroud');
  if(_sh){const _shL=wlvl('embershroud'),_shR=90*(p.aoeMul||1)*(p.zoneMul||1)*(1+.4*(_shL>=2?1:0))*(1+.2*cntAt(_shL,[4,6,8]))*(_sh.evo?1.3:1);
   p.shroudR=_shR;p.shroudEvo=!!_sh.evo;p._shroudT=(p._shroudT||0)-dt;
   if(p._shroudT<=0){p._shroudT=1;p._shroudTickT=performance.now()/1000; /* v142: the draw pass flares the ember field off this tick stamp */const _shDmg=p.damage*weaponDmgMul(_sh),_shStack=p.damage*.13*(1+(((p.treeSkillPct||{}).basic)||0)/100);let _shHit=0;
    enemies.slice().forEach(e=>{if(e.dead)return;if(Math.hypot(e.x-p.x,e.y-p.y)<_shR+e.r){_shHit++;damageEnemy(e,_shDmg,'fire');if(!e.dead){applyBurnStack(e,_shStack);if(_sh.evo){const _ka=Math.atan2(e.y-p.y,e.x-p.x);e.kx=(e.kx||0)+Math.cos(_ka)*120*(p.kbMul||1)*(KBRES[e.type]??1);e.ky=(e.ky||0)+Math.sin(_ka)*70*(p.kbMul||1)*(KBRES[e.type]??1)}}}});
-   if(_shHit>0){ringFx(p.x,p.y,_shR,_sh.evo?'#c9a2ff':'#ff8a3a');for(let _li=0;_li<6;_li++){const _la=rand(0,6.28);spawnP(p.x+Math.cos(_la)*_shR*.9,p.y+Math.sin(_la)*_shR*.72,{vx:Math.cos(_la)*30,vy:rand(-60,-25),life:rand(.3,.5),max:.5,color:_sh.evo?(Math.random()<.5?'#c9a2ff':'#ff96dc'):'#ff7a2a',size:rand(3,5),shape:'flame',ramp:_sh.evo?SHADOW_RAMP:FLAME_RAMP,grav:-40})}} /* v135: the shroud's TICK is visible now — a flame ring pulses out and flame licks leap off the circle wherever it sears (v142: violet for the evolved Furnace Shroud) */
+   if(_shHit>0){sfx('swing',{w:'embershroud',cls:p.class});ringFx(p.x,p.y,_shR,_sh.evo?'#c9a2ff':'#ff8a3a');for(let _li=0;_li<6;_li++){const _la=rand(0,6.28);spawnP(p.x+Math.cos(_la)*_shR*.9,p.y+Math.sin(_la)*_shR*.72,{vx:Math.cos(_la)*30,vy:rand(-60,-25),life:rand(.3,.5),max:.5,color:_sh.evo?(Math.random()<.5?'#c9a2ff':'#ff96dc'):'#ff7a2a',size:rand(3,5),shape:'flame',ramp:_sh.evo?SHADOW_RAMP:FLAME_RAMP,grav:-40})}} /* v135: the shroud's TICK is visible now — a flame ring pulses out and flame licks leap off the circle wherever it sears (v142: violet for the evolved Furnace Shroud). v145: the tick is AUDIBLE now too — the aura breathes fire once a second (it was silent before; the audit's "sounds like a sword swing" was stale — the Pyromancer never swings, fire() returns early for 'hose') */
    if(_sh.evo&&_shHit>0)susHeal(.3)}
   /* v135 SHROUD CHURN: while the aura lives, flame motes rise off its rim every ~0.09s — motion INSIDE the circle, never bare rotation */
   p._shroudChurnT=(p._shroudChurnT||0)-dt;
@@ -2287,7 +2438,7 @@ function killEnemy(e){if(e.dead)return;e.dead=true;
 
  {const _xpBase=5+Math.floor(scaleWave()*.35), /* v113 CADENCE GUARD: gem base growth eased x0.7 -> x0.35 of scaleWave — the Phase 1 kill flood multiplies kill VOLUME, so per-kill value grows half as fast to hold late cadence inside 17-31 s/level against the preserved slope-42 curve (modelled in the v113 Monte Carlo) */_xpKind=((EBASE[e.type]||{}).xp||1),_xpVal=e.boss?25:Math.max(1,Math.round(_xpBase*_xpKind*(e.mini?5:1)));dropXpGem(e.x,e.y,_xpVal)} /* XP SCALES WITH THE FOE (P2 fix): gem value = (5 + floor(wave x 0.7)) x EBASE[type].xp — Skeleton/Zombie/Fallen/Spider 1x, Wraith/Archer/Cultist 2x, Demon/Beast 3x, Knight 4x — and mini-bosses pay x5 on top. v111 CADENCE RETUNE: the wave term steepened from floor(wave/2) to floor(wave x 0.7) so XP income is more back-loaded (gem base 5 at run start, same as v110; 19-21 in the last minutes, was 15-17) — see the harness numbers at xpCostForLevel. v110 BOSS GEM FLATTENED: a boss drops a flat 25 XP gem (was 80 x (1 + 0.3 per boss felled) — a lump worth 3+ levels at L2 and 0.8% of a level at L28); a boss's real value is its chest, not XP. v110: every gem lands through dropXpGem, which enforces the 400-gem ground cap. v129: gems pay out in 1/5/25 tiers and fold into piles at the cap. */
  /* MAGNET PICKUP — a rare ground drop, NOT a gear item: regular kills 0.4%, mini-bosses 12%, a boss 18%, never more than 2 waiting on the ground, so it stays special and is absent from many runs. Walking over it magnetises every XP gem on the map (see update()). */
- if(magnets.length<2&&Math.random()<((e.boss?.18:e.mini?.12:.004)*(1+(p.luck||0)))){const mp=lootPos(e.x+rand(-16,16),e.y+rand(-12,12));magnets.push({x:mp.x,y:mp.y});showToast('A MAGNET dropped — walk over it to scoop every XP gem on the map!');sfx('rune')}
+ if(magnets.length<2&&Math.random()<((e.boss?.18:e.mini?.12:.004)*(1+(p.luck||0)))){const mp=lootPos(e.x+rand(-16,16),e.y+rand(-12,12));magnets.push({x:mp.x,y:mp.y});showToast('A MAGNET dropped — walk over it to scoop every XP gem on the map!');sfx('magnetdrop')}
  if(findWeapon(p,'reaperstithe')&&Math.random()<((e.mini?.08:.02)*(1+(p.luck||0)))){const _hp=lootPos(e.x+rand(-10,10),e.y+rand(-8,8));if(hearts.length<20)hearts.push({x:_hp.x,y:_hp.y,px:_hp.x,py:_hp.y,rx:_hp.x,ry:_hp.y,sp:0});else{p.hp=Math.min(p.maxHp,p.hp+10);floater(e.x,e.y-60,'+10 HP','#39d353',16)}} /* v135 VS COLOURS: heals print GREEN (was pink) */ /* v133 REAPER'S TITHE: slain foes rarely drop a heart. v144: the heart is REAL now — a ground pickup, magnetized like gems, +10 HP on pickup (the heal waits for the walk-over, it no longer lands at once — the one sustain-timing change in v144). At 20 hearts on the ground the heal lands at once instead, so it is never lost */
  if(!e.boss&&p.potions<3&&Math.random()<((e.mini?.05:.011)*(1+(p.luck||0)))){p.potions++;floater(e.x,e.y-60,'+1 POTION','#39d353',16);showToast('A life potion dropped! Press Q to drink — now holding '+p.potions);sfx('potion')} /* POTION PRESSURE (SOAK FIX v62): the v61 soak gained potions x3 to x9 and drank ONE in 13 minutes — at 2.5% per kill a 1,273-kill run minted ~30 potions against a cap of 9, so the satchel was effectively always full. Drops were then ~1.1% (elites ~5%) and the satchel capped at 6: over a long run supply roughly matched real use, so a potion was a decision again. (v102 lowered supply further — 0.6% / 3%, cap 5; v104 WALKS THAT CUT BACK — see the v104 note at the end of this comment; the code on this line IS the v104 values.) The 3 starting potions and the 45% heal are unchanged, so the early game is no harsher. v102 SUPPLY REBALANCE (Monte Carlo QA v101, problem 4): the v100 pilot thresholds made drinking CORRECT — and exposed that supply was the real lever: never drinking collapsed Barbarian 100% -> 16% and Sorceress 21% -> 0%, while Sorceress drank 25.3 potions a run (4+ satchels) because ~1.1% of ~1,600 kills plus 60g refills minted them faster than fights could spend them. Supply is now the constraint, not the drinking: drops 1.1% -> 0.6% (elites 5% -> 3%), satchel cap 6 -> 5, the retired price 60g -> 90g. v104 WALKBACK (Monte Carlo QA v103, problem 1 — CRITICAL): the v103 cycle decomposed that cut and it was the whole regression — potions-only reversion measured the cut at −0.73 floors for Barbarian Gloom against +0.33 from every other v103 change combined (net −0.40), and the middle roster starved on it: Sorceress completion 21% -> 12.5% and single-target 7% -> 0%, Necromancer single 100% -> 72%, Assassin mobility Floor 4 clears 99 -> 77/200, Paladin tank potions 27.2 -> 17.0 a run with no survival gain. Supply is therefore RESTORED to the v101 values on this line — drops 1.1% (elites 5%), satchel cap 6, the retired price 60g — the levels the v62 soak originally calibrated, where supply roughly matched real use. Potions stay a meaningful choice through the 45% heal size, the 3-potion start and the pilot's v100 drinking thresholds, not through scarcity: what the walkback removes is starvation as the binding constraint, not judgement about WHEN to drink. The 0.15s quaff i-frame is unchanged. v122: the satchel CAP drops 6 -> 3 (the gate on this line) — the drop RATES are untouched, but at 3 held the drop simply does not happen: the existing at-cap behaviour, nothing granted and no conversion */
  if(Math.random()<.3){const _gv=Math.floor(rand(1,5)*p.goldBonus),_cp=lootPos(e.x+rand(-12,12),e.y+rand(-10,10));if(coins.length<200)coins.push({x:_cp.x,y:_cp.y,px:_cp.x,py:_cp.y,rx:_cp.x,ry:_cp.y,value:_gv,sp:0});else gold+=_gv} /* v144: kill gold drops as a VISIBLE coin — magnetized like gems, credited on pickup with a gold floater (was silent instant credit + a sfx). At 200 coins on the ground the gold credits at once instead, so it is never lost */
@@ -2300,7 +2451,7 @@ function killEnemy(e){if(e.dead)return;e.dead=true;
     no elite payout exists. A MINI-BOSS pays with the thing that
     replaced elites: a boss chest dropped where it fell (plus +3
     Soul Shards for the kill itself; the chest gives levels only). */
- if(e.mini){runShards+=3;ringFx(e.x,e.y,60,'#ffd94a');pixelBurst(e.x,e.y,8,['#ffd94a','#ffffff'],3,60); /* v143 BOSS KILL-POP: the mini-boss pops a gold ring + pixel burst (the trash-only kill pop, grown up — same impact-burst grammar) */const cp=lootPos(e.x,e.y);chests.push({x:cp.x,y:cp.y,open:false,boss:true,mini:true,bossName:e.miniName||'MINI-BOSS'});floater(e.x,e.y-52,'MINI-BOSS FELLED — +3 Soul Shards · a boss chest drops!','#ffb02a',14);showToast('Mini-boss felled — walk over its chest to spin the reels');sfx('chest')}
+ if(e.mini){runShards+=3;ringFx(e.x,e.y,60,'#ffd94a');pixelBurst(e.x,e.y,8,['#ffd94a','#ffffff'],3,60); /* v143 BOSS KILL-POP: the mini-boss pops a gold ring + pixel burst (the trash-only kill pop, grown up — same impact-burst grammar) */const cp=lootPos(e.x,e.y);chests.push({x:cp.x,y:cp.y,open:false,boss:true,mini:true,bossName:e.miniName||'MINI-BOSS'});floater(e.x,e.y-52,'MINI-BOSS FELLED — +3 Soul Shards · a boss chest drops!','#ffb02a',14);showToast('Mini-boss felled — walk over its chest to spin the reels');sfx('chestdrop')}
  if(e.boss){sfx('bossdie');addTrauma(1);addHitStop(.14);screenFlash('#ffffff',.2,.2);ringFx(e.x,e.y,110,'#ffd94a');pixelBurst(e.x,e.y,14,['#ffd94a','#fff3d0','#ffffff'],3.5,60); /* v143 BOSS KILL-POP: the boss pops a big gold ring + pixel burst on top of the white flash — the kill-pop ring bosses never had */bossRef=null; /* v135: the boss death lands a white screen flash */bossSpawned=false;ui('bossbar').style.display='none';runShards+=8;bossCount++;floorNum=1+bossCount;trackDepth();if(difficulty==='normal')meta.normalBossKills=(meta.normalBossKills||0)+1;saveAll();
   const bName=e.bossName||'THE DREAD KNIGHT';const cp=lootPos(e.x,e.y);chests.push({x:cp.x,y:cp.y,open:false,boss:true,bossName:bName});
   showToast('Boss felled — +8 Soul Shards · a BOSS CHEST drops where it fell — walk over it to spin the reels');return} /* v109: the run NEVER leaves the arena — no Town, no Descend, no floor change. The felled boss drops its chest; opening it (openSlotChest) is the only evolution source in the game */
@@ -2471,7 +2622,7 @@ function spawnBoss(){bossSpawned=true;bossIntermission=0;spawnEnemy(true)}
 const MINI_BOSS_NAMES=['GORATH THE RENT','MOTHER VEXA','SIR CALLOUS','THE PALE BUTCHER','HAG MORVANE','BROTHER SILAS','THE GILDED HUNGER','CAPTAIN MORROW'];
 function spawnMiniBoss(){if(enemies.some(e=>e.mini&&!e.dead))return;const e=spawnEnemy(false,pick(['Knight','Demon','Beast']));if(!e)return;
  e.mini=true;e.miniName=pick(MINI_BOSS_NAMES);e.maxHp=e.hp=Math.round(e.hp*9);e.damage=Math.round(e.damage*2.2);e.r=Math.round(e.r*1.7);e.speed*=.92;
- showToast('◆ MINI-BOSS — '+e.miniName+' rises! Fell it for a boss chest');sfx('boss')}
+ showToast('◆ MINI-BOSS — '+e.miniName+' rises! Fell it for a boss chest');sfx('miniboss')}
 /* ---------------- v109 THE RED DEATH ----------------
    At exactly 30:00 it arrives. It is NOT a boss: damageEnemy refuses
    it outright (no damage, no damage numbers, no leech), DoTs and
@@ -2481,7 +2632,7 @@ function spawnMiniBoss(){if(enemies.some(e=>e.mini&&!e.dead))return;const e=spaw
 let rdBannerTimer=0;
 function spawnRedDeath(){if(redDeathRef&&!redDeathRef.dead)return redDeathRef;const e=spawnEnemy(false,'DreadKnight');if(!e)return null;
  e.redDeath=true;e.hp=e.maxHp=999999999;e.damage=0;e.r=Math.round(30*ENEMY_SCALE);e.speed=1.5;e.bossScale=1.6;redDeathRef=e;
- showToast('◆ THE RED DEATH IS HERE — one touch ends your run. There is no fighting it.');sfx('bossdie');addTrauma(1);const _rd=ui('rdFx');if(_rd){_rd.classList.remove('show');void _rd.offsetWidth;_rd.classList.add('show');clearTimeout(rdBannerTimer);rdBannerTimer=setTimeout(()=>{_rd.classList.remove('show')},2600)}const _rv=ui('rdVeil');if(_rv)_rv.classList.add('show');return e} /* v141: the Red Death arrives with a ceremony — full-screen darkening + red vignette (stays while he hunts) + a banner, on the #evoFx pattern */
+ showToast('◆ THE RED DEATH IS HERE — one touch ends your run. There is no fighting it.');sfx('reddeath');addTrauma(1);const _rd=ui('rdFx');if(_rd){_rd.classList.remove('show');void _rd.offsetWidth;_rd.classList.add('show');clearTimeout(rdBannerTimer);rdBannerTimer=setTimeout(()=>{_rd.classList.remove('show')},2600)}const _rv=ui('rdVeil');if(_rv)_rv.classList.add('show');return e} /* v141: the Red Death arrives with a ceremony — full-screen darkening + red vignette (stays while he hunts) + a banner, on the #evoFx pattern */
 function redDeathKill(){if(state!=='play')return;runEnder='reddeath';player.hp=0;sfx('gameover');gameOver()}
 
 /* ---------------- WAVE SPAWNING (v57) ----------------
@@ -2652,7 +2803,7 @@ function meleeRange(){const p=player,n=p.effShots||1;const _bk=basicKind();let b
 function faceTowardAng(ang){const p=player;const sdx=Math.cos(ang)-Math.sin(ang);if(Math.abs(sdx)>.2)p.face=sdx>=0?1:-1}
 function meleeHit(e,dmg,el){const p=player;const _bt=starterEvoW()&&(basicKind()==='cleave'||basicKind()==='smite'||basicKind()==='claw');const _wc=wCritFor((starterWeaponOf(p.class)||{}).id);const crit=Math.random()<Math.min(.70,p.crit+(_wc?_wc.ch:0));if(crit&&_wc)damageEnemy(e,dmg*(_wc.mult/(1+(p.critDmg||.5))),el,true);else if(crit&&_bt)damageEnemy(e,dmg*(2/(1+(p.critDmg||.5))),el,true);else damageEnemy(e,dmg,el,crit);return crit} /* v133: weapon base crit (Whip twins 20% 2x) rolls on top of the hero's crit; the evolved 2x and the weapon 2x are the same multiplier, never stacked */ /* v130 BLOODY TEAR: evolved Whip-twin crits deal 2x total (damageEnemy applies 1+critDmg, so the pre-scale divides it back out) and leech via the raised p.lifeSteal in recalc, paid from the shared sustain budget */
 function meleeBasic(ang){
- const p=player,k=basicKind();p.attackT=.24;faceTowardAng(ang);sfx('swing',{cls:p.class});const _evoS=starterEvoW(); /* v130: evolved starter verbs live here */
+ const p=player,k=basicKind();p.attackT=.24;faceTowardAng(ang);sfx('swing',{w:(starterWeaponOf(p.class)||{}).id,cls:p.class});const _evoS=starterEvoW(); /* v145: the melee swing follows the WEAPON (Ashen Blade / Shadowfang / Blessed Mace each sound like themselves) */
  const n=p.effShots||1,baseDmg=p.damage*starterDmgMul(p)*(p.rageT>0?1+(p.ragePow||.4):1)*(p.slipT>0?1.2:1)*(1+(((p.treeSkillPct||{}).basic)||0)/100),_br=1+(((p.treeSkillRadius||{}).basic)||0)/100;
  const _sw=starterWeaponOf(p.class),_L=_sw?wlvl(_sw.id):1,_behind=_L>=2&&(k==='cleave'||k==='smite'||k==='claw'); /* v130 WHIP L2: the swing also strikes BEHIND */
  if(k==='cleave'){
@@ -2698,7 +2849,7 @@ function fire(){const p=player,k=basicKind();
  if(k==='hose')return; /* v133: the Ember Shroud is an aura — it ticks in weaponTick, not through the basic attack */
  if(k==='axe'&&starterEvoW())return; /* v133 DEATH SPIRAL: the evolved Venomfang is a persistent orbit — it never throws axes */
  if(k==='bow'){ /* v130 FACING-DIRECTION AIM (authorized): Gravebow arrows fly in the hero's FACING direction (p.moveAng, the last movement angle), not at the nearest foe */
-  p.attackT=.22;sfx('swing',{cls:p.class});const _n=Math.min(7,(p.effShots||1)+basicBonusShots()),_a=(p.moveAng!=null?p.moveAng:0);
+  p.attackT=.22;sfx('swing',{w:'gravebow',cls:p.class});const _n=Math.min(7,(p.effShots||1)+basicBonusShots()),_a=(p.moveAng!=null?p.moveAng:0);
   muzzleFlash(p.x+Math.cos(_a)*18,p.y-12+Math.sin(_a)*8,starterEvoW()?'#ffe9a8':'#e8c07a'); /* v144: the bow flash fires from the SIDE, along the facing direction — the tell reads as a draw, not a wand */
   if(starterEvoW()){p.recoilT=.12;p.recoilAng=_a+Math.PI} /* v144 RECOIL: the evolved Marrow Bow kicks the hero back 4px along the shot line */
   for(let i=0;i<_n;i++)spawnBasicShot(_a+(i-(_n-1)/2)*.16);return}
@@ -2706,7 +2857,7 @@ function fire(){const p=player,k=basicKind();
  let alt=null,bd=1e18;for(const e of enemies){if(e.dead)continue;const dd=Math.hypot(e.x-player.x,e.y-player.y);if(dd<bd&&losClear(player.x,player.y,e.x,e.y)){bd=dd;alt=e}}if(alt)target=alt}
  if(!target)return;const ang=Math.atan2(target.y-p.y,target.x-p.x);
  if(isMeleeBasic()){if(Math.hypot(target.x-p.x,target.y-p.y)>meleeRange()+target.r)return;meleeBasic(ang);return}
- p.attackT=.22;sfx('swing',{cls:p.class});
+ p.attackT=.22;sfx('swing',{w:(starterWeaponOf(p.class)||{}).id,cls:p.class}); /* v145: the ranged basic follows the WEAPON — Frostbrand peps, Ironbark snaps, Bone Wand rattles, Venomfang whistles */
  muzzleFlash(p.x+(p.face<0?-10:10),p.y-14,k==='arcane'?(starterEvoW()?'#ffd94a':'#b78bff'):k==='thorn'?(starterEvoW()?'#ffd94a':'#7ec850'):k==='bone'?(starterEvoW()?'#c9a2ff':'#efe8d6'):k==='axe'?'#9ae36a':'#fff3d0'); /* v144: the wand/thorn/bone/axe flash fires from the CASTING HAND (10px to the facing side) */
  if(k==='bone'&&starterEvoW()){p.recoilT=.12;p.recoilAng=ang+Math.PI} /* v144 RECOIL: the evolved Bone Wand's single huge shard kicks the hero back 4px */
  const n=(k==='bone'&&starterEvoW())?1:Math.min(7,(p.effShots||1)+basicBonusShots()); /* v133: the evolved Bone Wand fires ONE huge shard; v130: weapon-level bonus shots stack with effShots, total cap 7 */
@@ -2721,12 +2872,12 @@ function skillAoe(key){const p=player;if(!p)return 1;return (p.aoeMul||1)*(1+(((
 function effDamage(mult,el){const p=player;let d=p.damage*mult;if(el==='fire')d+=p.fireEl;if(el==='cold')d+=p.coldEl;if(el==='light')d+=p.lightEl;if(p.rageT>0)d*=(1+(p.ragePow||.4));if(p.slipT>0)d*=1.2; /* v97 Slipstream: +20% skill damage for 1s after a dash */ if(p._treeSMul)d*=p._treeSMul; /* skill-route damage multiplier, set for the duration of one cast in castSkill */ return d}
 /* v133 REAPER'S TITHE (Silver Wind twin): one sweeping scythe slash. Range 165 x aoeMul, +20% at Lv 3/5/7 (the VS Speed steps, mapped to reach — a sweep has no projectile to speed up), x1.6 when evolved (Area 160%). The evolved slash WEAKENS every foe it hits (+25% damage taken for 3s). Shared by the cast, the Festive Winds timer and — no, Legion Blade has its own helper. */
 function scytheSlash(p,lvl,evo,ang){const w=findWeapon(p,'reaperstithe');if(!w)return;const range=165*(p.aoeMul||1)*(1+.2*cntAt(lvl,[3,5,7]))*(evo?1.6:1),arc=2.6,dmg=p.damage*weaponDmgMul(w),a=ang!=null?ang:(()=>{const t=nearestTo(p.x,p.y,range+60);return t?Math.atan2(t.y-p.y,t.x-p.x):(p.face<0?Math.PI:0)})();
- fx.push({type:'slash',x:p.x,y:p.y,ang:a,range,arc,col:'#ff6a7a',t:0,dur:.26,kind:'scythe'});sfx('swing',{cls:p.class});
+ fx.push({type:'slash',x:p.x,y:p.y,ang:a,range,arc,col:'#ff6a7a',t:0,dur:.26,kind:'scythe'});sfx('cast',{type:'scythe'});
  enemies.slice().forEach(e=>{if(e.dead)return;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<range+e.r&&Math.abs(angDiff(Math.atan2(e.y-p.y,e.x-p.x),a))<arc/2){damageEnemy(e,dmg,'phys');if(!e.dead){if(evo)e.weakT=3;const ka=Math.atan2(e.y-p.y,e.x-p.x);e.kx=(e.kx||0)+Math.cos(ka)*120*(p.kbMul||1)*(KBRES[e.type]??1);e.ky=(e.ky||0)+Math.sin(ka)*70*(p.kbMul||1)*(KBRES[e.type]??1)}}})}
 /* v133 LEGION BLADE (Eskizzibur twin): one sword slash at nearby foes. Range 150 x aoeMul, x1.3 when evolved (Area 130%). Base crit 20% 2x, rolled once per slash. When retal=true the slash is a RETALIATION (struck back after taking a hit) — its damage scales with Veteran Sigil (p.retalDmgMul). When fin=true it is the combo finisher (every 5th cast from Lv 5): 2x damage, 1.5x range, gold arc. */
 function legionSlash(p,lvl,evo,ang,retal,fin){const w=findWeapon(p,'legionblade');if(!w)return;const range=150*(p.aoeMul||1)*(evo?1.3:1)*(fin?1.5:1),arc=2.4;let dmg=p.damage*weaponDmgMul(w)*(fin?2:1);if(retal)dmg*=(p.retalDmgMul||1);const _lc=wCritFor('legionblade');let _lcCrit=false;if(_lc&&Math.random()<Math.min(.70,p.crit+_lc.ch)){_lcCrit=true;dmg=dmg*_lc.mult/(1+(p.critDmg||.5))}
  const a=ang!=null?ang:(()=>{const t=nearestTo(p.x,p.y,range+60);return t?Math.atan2(t.y-p.y,t.x-p.x):(p.face<0?Math.PI:0)})();
- fx.push({type:'slash',x:p.x,y:p.y,ang:a,range,arc,col:fin?'#ffe9a8':(retal?'#ff9a5a':'#c9d6ff'),t:0,dur:.24,kind:'legion',evo:evo?1:0});sfx('swing',{cls:p.class}); /* v135: a RETALIATION slash draws ember-orange, distinct from the pale-blue normal slash — the player sees the weapon answer a hit */ /* v144: the slash carries its evo flag — the evolved Legion slash plays the legion_evo_slash strip */
+ fx.push({type:'slash',x:p.x,y:p.y,ang:a,range,arc,col:fin?'#ffe9a8':(retal?'#ff9a5a':'#c9d6ff'),t:0,dur:.24,kind:'legion',evo:evo?1:0});sfx('cast',{type:'legion'}); /* v135: a RETALIATION slash draws ember-orange, distinct from the pale-blue normal slash — the player sees the weapon answer a hit */ /* v144: the slash carries its evo flag — the evolved Legion slash plays the legion_evo_slash strip */
  enemies.slice().forEach(e=>{if(e.dead)return;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<range+e.r&&Math.abs(angDiff(Math.atan2(e.y-p.y,e.x-p.x),a))<arc/2)damageEnemy(e,dmg,'phys',_lcCrit)})}
 function choirSeed(z,n,violet){for(let i=0;i<n;i++){const _gx=(Math.random()+Math.random()+Math.random()-1.5)/1.5,_vio=violet&&Math.random()<.4;spawnP(z.x+_gx*z.r*.8,z.y+rand(-z.r*1.6,z.r*1.6),{vx:rand(-6,6),vy:rand(-26,-8),life:rand(.8,1.6),max:1.6,color:_vio?'#c9a2ff':(Math.random()<.7?'#fff3d0':'#ffd94a'),size:rand(.5,1.3)*3.2,shape:'ember',grav:-6,drag:.98,tw:.7,ramp:_vio?SHADOW_RAMP:HOLY_RAMP,follow:1})}} /* v141 CHOIR v8: the cast opens with a shimmer of motes across the column — no ring, no slam, no burst */
 function castSkill(idx,echo){
@@ -2814,8 +2965,8 @@ function castSkill(idx,echo){
   else{const _cz={kind:'choir',x:p.x,y:p.y,px:p.x,py:p.y,rx:p.x,ry:p.y,r:_cW,t:_cDur,tick:0,follow:1,tickInt:_cTick,wmul:weaponDmgMul(findWeapon(p,'choir')),flashT:0,waveT:0};_cz.tMax=_cDur;zonesFx.push(_cz);choirSeed(_cz,lowFx?30:60,0)} /* v141 CHOIR v8: the column materialises out of shimmer — the v135 slam ring + burst are gone */
   sfx('bell');break} /* CHOIR OF THE DEEP (v132, Song of Mana twin): a vertical column of holy light centred on the hero — foes inside the column are struck as the beams pulse. EVOLUTION Mannajja: the column becomes FIVE concentric pulsing rings that follow you forever, and every foe a ring strikes is slowed PERMANENTLY, 5% per hit down to a fifth of its speed */
  case 'needle':{const _evoN=hasEvo('evoNeedle'),_nLvl=wlvl('cardinalneedle'),_nN=_evoN?10:1+cntAt(_nLvl,[2,4,6,8]),_nDmg=effDamage(1,'phys'),_nRoot=1+.1*_nLvl; /* v133 CARDINAL NEEDLE (Scarlet Needle twin): needles pin the nearest foe — root 1s + 0.1s/level, bosses immune, mini-bosses half. Lv 2/4/6/8 +1 needle (5 at Lv8); CD 2.0s -> 1.5s via cdL */
-  if(_evoN){const _tgt=enemies.filter(e=>!e.dead).sort(()=>Math.random()-.5).slice(0,_nN);_tgt.forEach(t=>shots.push({x:t.x,y:t.y-320,vx:0,vy:10*psm,damage:_nDmg,crit:false,r:6*aom,hitR:14*aom,color:'#ffd94a',life:60,aoe:0,el:'phys',kind:'needle',pierce:false,hitSet:new Set(),rootT:_nRoot}));fx.push({type:'anim',anim:'needle_rain',x:p.x,y:p.y,t:0,dur:.6,size:Math.max(W,H)*1.05,fps:14,mode:'loop',fade:1,add:1}); /* v136 PHASE 3: the rain strip — 2 frames looped fast (14fps) over the needles' fall so it reads as motion, not a cut; fades out as the last needles land */sfx('whoosh');pixelBurst(p.x,p.y-40,8,'#ffd94a');showToast('CARDINAL RAIN — needles fall from the sky!')}
-  else{const t=nearest();if(!t)break;const a=Math.atan2(t.y-p.y,t.x-p.x);for(let ni=0;ni<_nN;ni++){const na=a+(ni-(_nN-1)/2)*.06;shots.push({x:p.x,y:p.y-12,vx:Math.cos(na)*10*psm,vy:Math.sin(na)*10*psm,damage:_nDmg,crit:false,r:6*aom,hitR:10*aom,color:'#ffd94a',life:110,aoe:0,el:'phys',kind:'needle',pierce:false,hitSet:new Set(),rootT:_nRoot})}sfx('whoosh')}
+  if(_evoN){const _tgt=enemies.filter(e=>!e.dead).sort(()=>Math.random()-.5).slice(0,_nN);_tgt.forEach(t=>shots.push({x:t.x,y:t.y-320,vx:0,vy:10*psm,damage:_nDmg,crit:false,r:6*aom,hitR:14*aom,color:'#ffd94a',life:60,aoe:0,el:'phys',kind:'needle',pierce:false,hitSet:new Set(),rootT:_nRoot}));fx.push({type:'anim',anim:'needle_rain',x:p.x,y:p.y,t:0,dur:.6,size:Math.max(W,H)*1.05,fps:14,mode:'loop',fade:1,add:1}); /* v136 PHASE 3: the rain strip — 2 frames looped fast (14fps) over the needles' fall so it reads as motion, not a cut; fades out as the last needles land */sfx('needlerain');pixelBurst(p.x,p.y-40,8,'#ffd94a');showToast('CARDINAL RAIN — needles fall from the sky!')}
+  else{const t=nearest();if(!t)break;const a=Math.atan2(t.y-p.y,t.x-p.x);for(let ni=0;ni<_nN;ni++){const na=a+(ni-(_nN-1)/2)*.06;shots.push({x:p.x,y:p.y-12,vx:Math.cos(na)*10*psm,vy:Math.sin(na)*10*psm,damage:_nDmg,crit:false,r:6*aom,hitR:10*aom,color:'#ffd94a',life:110,aoe:0,el:'phys',kind:'needle',pierce:false,hitSet:new Set(),rootT:_nRoot})}sfx('needleshot')}
   break} /* EVOLUTION Cardinal Rain: the single-target pin becomes a screen-wide rain of 10 needles falling from above, rooting every foe they strike */
  case 'scythe':{const _evoS=hasEvo('evoScythe'),_sLvl=wlvl('reaperstithe'),_sN=_evoS?8:Math.min(8,1+_sLvl); /* v133 REAPER'S TITHE (Silver Wind twin): sweeping scythe slashes around the hero — amt 2 at Lv1, +1 per level, 8 at Lv7-8. Speed +20% at Lv3/5/7 widens the sweep. Slain foes drop hearts (the killEnemy hook). */
   if(_evoS){p._scythePend=8;p._scytheT=0;p._scytheAng=rand(0,6.28);showToast('FESTIVE WINDS — eight slashes, and every hit weakens!')}
@@ -2829,7 +2980,7 @@ function castSkill(idx,echo){
  case 'rune':{const _evoR=hasEvo('evoRune'),_rLvl=wlvl('runerebound'),_rN=_evoR?1:1+cntAt(_rLvl,[2,4,6]),_rSp=(1+.2*cntAt(_rLvl,[4,7]))*(_evoR?2.8:1),_rDmg=effDamage(1,'phys'); /* v133 RUNE REBOUND (Runetracer twin): a bouncing rune diamond — +1 rune/bounce at Lv 2/4/6 (3 at Lv8), Speed +20% at Lv 4/7 (140% at Lv7-8), duration 2.25s, CD 3.0s. The audit's Speed steps (Lv 3/5/7) would give 160%, contradicting its own 140% target — two steps at Lv 4/7 reach 140% exactly. */
   const t=nearest();if(!t)break;const a=Math.atan2(t.y-p.y,t.x-p.x);
   for(let ri=0;ri<_rN;ri++){const ra=a+(ri-(_rN-1)/2)*.12;shots.push({x:p.x,y:p.y-12,vx:Math.cos(ra)*8*psm*_rSp,vy:Math.sin(ra)*8*psm*_rSp,damage:_rDmg,crit:false,r:7*aom,hitR:11*aom,color:'#c9a2ff',life:135,aoe:0,el:'spell',kind:'rune',pierce:false,hitSet:new Set(),ricochet:_evoR?12:_rN,evoRune:_evoR})}
-  sfx('whoosh');break} /* EVOLUTION NO FUTURE: the rune explodes on every bounce, Speed 280%, CD 1.0s */
+  sfx('runefly');break} /* EVOLUTION NO FUTURE: the rune explodes on every bounce, Speed 280%, CD 1.0s */
  case 'bulwark':{const _evoB=hasEvo('evoBulwark'),_bLvl=wlvl('bulwarkoath'),_bCh=1+cntAt(_bLvl,[3,5,7]); /* v133 BULWARK OATH (Laurel twin): a shield ring that blocks whole hits — charges 1 at Lv1-2, +1 at Lv3/5/7 (4 at Lv7-8). CD 10s -> 7.5s via cdL. Reuses the hurtPlayer p.shield block. */
   p.shield=Math.min(4,(p.shield||0)+_bCh);sfx('block');ringFx(p.x,p.y,70,'#8fd4ff');showToast(_evoB?'CRIMSON SHROUD — the ring burns red, and no hit can take more than 10% of your health!':'Bulwark Oath — '+_bCh+' shield charge'+(_bCh>1?'s':'')+' raised!');
   break} /* EVOLUTION Crimson Shroud: caps ANY single hit at 10% of max HP; retaliates on charge loss (the hurtPlayer hook); the ring turns crimson + a burst on each capped hit */
@@ -2838,7 +2989,7 @@ function castSkill(idx,echo){
   coneFx(p.x,p.y,baseA,_fR,_fArc,'#9adfff','#e8f8ff','frost');
   for(let _fi=0;_fi<8;_fi++){const _fa=baseA+rand(-1,1)*_fArc*.5,_fd=rand(.4,1)*_fR;spawnP(p.x+Math.cos(_fa)*_fd,p.y+Math.sin(_fa)*_fd*.8,{vx:rand(-20,20),vy:rand(-40,-10),life:rand(.4,.7),max:.7,color:'#d8f0ff',size:rand(2,4),shape:'shard',grav:40,rot:rand(0,6),vr:rand(-6,6)})} /* v135: the freeze beam sweeps visibly — ice shards fan out along the cone as it fires */
   enemies.slice().forEach(e=>{if(e.dead||e.boss)return;const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<_fR+e.r&&Math.abs(angDiff(Math.atan2(e.y-p.y,e.x-p.x),baseA))<_fArc/2){const _wasFr=e.freezeT>0;e.freezeT=Math.max(e.freezeT||0,_fDur*(e.mini?.5:1));if(!_wasFr)pixelBurst(e.x,e.y-12,2,'#d8f0ff');if(_evoF&&!e.hpHalved){e.hpHalved=true;e.maxHp=Math.max(1,Math.round(e.maxHp/2));e.hp=Math.min(e.hp,e.maxHp);p._frostPulse=1;pixelBurst(e.x,e.y-12,8,'#9adfff')}}});
-  sfx('whoosh');break} /* EVOLUTION Infinite Corridor: foes touched have max HP halved once each + a permanent rotating freeze column (weaponTick) + a pale-blue tint pulse on each halve */
+  sfx('freezeblast');break} /* EVOLUTION Infinite Corridor: foes touched have max HP halved once each + a permanent rotating freeze column (weaponTick) + a pale-blue tint pulse on each halve */
  case 'roar':{const _evoRo=hasEvo('evoRoar'),_rR=(_evoRo?245:185)*aom,_fear=(_evoRo?3.6:2.2);
   ringFx(p.x,p.y,_rR,'#b78bff');ringFx(p.x,p.y,_rR*.6,'#7a3fd1');pixelBurst(p.x,p.y-14,14,'#b78bff');sfx('roar');
   enemies.slice().forEach(e=>{if(e.dead)return;if(Math.hypot(e.x-p.x,e.y-p.y)<_rR+e.r){damageEnemy(e,effDamage(.6,'spell'),'spell');if(!e.dead)e.fearT=Math.max(e.fearT||0,_fear)}});
@@ -3130,7 +3281,7 @@ function buildBugReport(desc){
  lines.push('Build Codex: '+codexCount106()+' / 81 discovered');
  lines.push('Soul Shards: '+(meta.shards+(runShards||0)));
  lines.push('Browser: '+(navigator.userAgent||'unknown'));
- lines.push('Audio: '+(AUD.ctx?('context '+AUD.ctx.state+' · music '+(AUD.musOn?'on':'off')+(AUD.musTimer?' (timer running)':' (TIMER NOT RUNNING)')+' · muted '+(AUD.muted?'YES':'no')+' · master '+Math.round(AUD.vol*100)+' / SFX '+Math.round(AUD.sfxVol*100)+' / music '+Math.round(AUD.musVol*100)+' · voices '+AUD.voices):'not started — no tap/keypress yet this session'));
+ lines.push('Audio: '+(AUD.ctx?('context '+AUD.ctx.state+' · music '+(AUD.musOn?'on':'off')+(AUD.musTimer?' (timer running)':' (TIMER NOT RUNNING)')+' · muted '+(AUD.muted?'YES':'no')+' · master '+Math.round(AUD.vol*100)+' / SFX '+Math.round(AUD.sfxVol*100)+' / music '+Math.round(AUD.musVol*100)+' · voices '+(AUD.vMus+AUD.vSfx)+' (mus '+AUD.vMus+' / sfx '+AUD.vSfx+')'):'not started — no tap/keypress yet this session'));
  lines.push('Viewport: '+innerWidth+' × '+innerHeight+' · Device pixel ratio: '+(devicePixelRatio||1)+' · Touch: '+((('ontouchstart' in window)||navigator.maxTouchPoints>0)?'yes':'no'));
  lines.push('Recent in-game errors (this session):');
  if(BUG_ERRORS.length)BUG_ERRORS.slice(-8).forEach(e=>lines.push(' - '+e));else lines.push(' - None captured');
@@ -3657,13 +3808,13 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
     touch or by an ordinary death. A boss whose slot arrives while
     the previous boss still lives waits for the arena to clear. */
  if(elapsed>=1770&&!redDeathWarned){redDeathWarned=true;showToast('◆ 30 SECONDS — the Red Death comes at 30:00. One touch ends the run. Spend everything.');sfx('bosstease')}
- if(elapsed>=1800&&!redDeathRef){survived30=true;showFanfare({title:'YOU SURVIVED 30:00',sub:'The Descent is won — now survive the Red Death',rarity:'Mythic',dur:3400});sfx('fanfare');screenFlash('#ffd94a',.25,.4);spawnRedDeath()} /* v144 WIN CEREMONY: surviving to 30:00 IS the win — a Mythic fanfare, a gold flash and a grade bonus on the death screen (see gameOver). Red Death still arrives as the post-30:00 threat */
+ if(elapsed>=1800&&!redDeathRef){survived30=true;showFanfare({title:'YOU SURVIVED 30:00',sub:'The Descent is won — now survive the Red Death',rarity:'Mythic',dur:3400});sfx('winfanfare');screenFlash('#ffd94a',.25,.4);spawnRedDeath()} /* v144 WIN CEREMONY: surviving to 30:00 IS the win — a Mythic fanfare, a gold flash and a grade bonus on the death screen (see gameOver). Red Death still arrives as the post-30:00 threat */
  if(!redDeathRef){
   if(elapsed>=nextMiniAt&&nextMiniAt<1800){nextMiniAt+=300;miniCount++;miniTeased=false;spawnMiniBoss()}
   if(elapsed>=nextBossAt&&nextBossAt<1800&&!(bossRef&&!bossRef.dead)){nextBossAt+=300;bossTeased=false;spawnBoss()}
   const _bi=bossIn();if(!bossTeased&&_bi>0&&_bi<=30){bossTeased=true;showToast('A dread presence gathers — '+nextBossName()+' rises in ~30 seconds. Finish your streak, drink up.');sfx('bosstease')}
   const _mi=nextMiniAt-elapsed;if(!miniTeased&&_mi>0&&_mi<=30){miniTeased=true;showToast('Something stirs below — a mini-boss rises in ~30 seconds.');sfx('bosstease')}} /* v144 MINI-BOSS TEASE: the 2:30 mini-boss (and every 5:00 repeat) gets the same 30s warning toast + sting as the bosses */
- {const _min=Math.floor(elapsed/60);if(_min>=1&&_min<=29&&_min!==lastMinuteBanner){lastMinuteBanner=_min;const _mt={5:'THE HORDE GATHERS',10:'THE SWARM THICKENS',15:'THE DEEP STIRS',20:'THE DARK DEEPENS',25:'THE END APPROACHES'}[_min]||'MINUTE '+_min,_ms=['The horde grows hungrier','The deep does not forgive','Hold the line','The descent continues','No rest below'][_min%5];showFanfare({title:_mt,sub:_ms,rarity:'Legendary',dur:1800})}} /* v144 MINUTE BANNERS: every minute mark gets a banner — milestone minutes (5/10/15/20/25) get a named escalation, the rest a rotating subtitle. 30:00 is owned by the WIN ceremony, not a banner */
+ {const _min=Math.floor(elapsed/60);if(_min>=1&&_min<=29&&_min!==lastMinuteBanner){lastMinuteBanner=_min;const _mt={5:'THE HORDE GATHERS',10:'THE SWARM THICKENS',15:'THE DEEP STIRS',20:'THE DARK DEEPENS',25:'THE END APPROACHES'}[_min]||'MINUTE '+_min,_ms=['The horde grows hungrier','The deep does not forgive','Hold the line','The descent continues','No rest below'][_min%5];showFanfare({title:_mt,sub:_ms,rarity:'Legendary',dur:1800});sfx('banner',{big:(_min%5===0)?1:0})}} /* v145 MINUTE BANNERS: every minute mark gets a banner — milestone minutes (5/10/15/20/25) get a named escalation, the rest a rotating subtitle. 30:00 is owned by the WIN ceremony, not a banner. The banner finally has a sound: a low bell + drum tick, bigger on milestone minutes */
  updateWaves(dt); /* WAVE SPAWNING (v57): bursts + lulls, themed waves, taper and a pre-boss lull — see updateWaves() */
 
  {let _er=p.rate;const _evoB=starterEvoW(),_bkB=basicKind();if(_evoB&&(_bkB==='arcane'||_bkB==='thorn'||_bkB==='bow'))_er=3.6; /* v130 HOLY WAND / THOUSAND EDGE: NO COOLDOWN - basics fire at the 2.4 attack-speed cap regardless of p.rate. v144: evolved no-cooldown basics graduate to 3.6/s — the late game stops freezing its tempo at 15:00 (base weapons still cap at 2.4; Bone Wand is not in the list) */
@@ -3679,7 +3830,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
    for(const g of gems){if(Math.random()>=_ps.spare)g.collected=true} /* erased gems vanish (collected flag, no XP) — the wipe eats the field */
    gems=gems.filter(g=>!g.collected);
    if(_ps.evo){for(let _gi=0;_gi<10;_gi++){const _gv=_gi<2?25:5,_gp=lootPos(p.x+rand(-120,120),p.y+rand(-90,90));gems.push({x:_gp.x,y:_gp.y,px:_gp.x,py:_gp.y,rx:_gp.x,ry:_gp.y,vx:0,vy:0,sp:0,magnet:true,value:_gv,tier:gemTierOf(_gv),pile:false})}for(const g of gems)g.magnet=true} /* evolved: ten fresh gems at your feet (2 purple, 8 green) and every gem on the field vacuums to you */
-   ringFx(p.x,p.y,Math.max(W,H),'#b78bff');ringFx(p.x,p.y,Math.max(W,H)*.6,'#ffd94a');decalFx(p.x,p.y,200,'#b78bff','holy',2.5);screenFlash('#b78bff',.35,.3);addTrauma(.6);sfx('evolve',{el:'light'});fx.push({type:'anim',anim:'pentagram_shatter',x:p.x,y:p.y,t:0,dur:.55,size:Math.round(H*.55),fps:12,mode:'once'}); /* v136 PHASE 3: the shatter is the 4-frame glyph strip — glyph → cracking → shattering → fading shards, played once over the erasure; the 'img' pentagram_wipe glyph at cast is the Generation phase and stays */
+   ringFx(p.x,p.y,Math.max(W,H),'#b78bff');ringFx(p.x,p.y,Math.max(W,H)*.6,'#ffd94a');decalFx(p.x,p.y,200,'#b78bff','holy',2.5);screenFlash('#b78bff',.35,.3);addTrauma(.6);sfx('pentwipe');fx.push({type:'anim',anim:'pentagram_shatter',x:p.x,y:p.y,t:0,dur:.55,size:Math.round(H*.55),fps:12,mode:'once'}); /* v136 PHASE 3: the shatter is the 4-frame glyph strip — glyph → cracking → shattering → fading shards, played once over the erasure; the 'img' pentagram_wipe glyph at cast is the Generation phase and stays */
    showToast(_ps.evo?'PENTAGRAM — the field is wiped clean, and the gems rain down!':'PENTAGRAM — the field is wiped clean!');
    p.pentSeq=null}}
  if(p.whirlT>0){p.whirlT-=dt;p._wa=(p._wa||0)+dt*13.5;if(!lowFx){p._we=(p._we||0)+dt*46;while(p._we>=1){p._we-=1;const _wr2=118*skillAoe('s1')*(hasEvo('evoWhirl')?1.75:Math.pow(1.25,cntAt(wlvl('cycloneblade'),[3,6])))*(p.zoneMul||1),_wa2=p._wa+rand(-.3,.3),_rr2=_wr2*rand(.55,1),_sx2=p.x+Math.cos(_wa2)*_rr2,_sy2=p.y+Math.sin(_wa2)*_rr2*.8,_tx2=-Math.sin(_wa2),_ty2=Math.cos(_wa2);if(Math.random()<.62)spawnP(_sx2,_sy2,{vx:_tx2*rand(70,130)+Math.cos(_wa2)*26,vy:_ty2*24+rand(-30,-8),life:rand(.3,.55),max:.55,color:'#b8a888',size:rand(3,6),shape:'smoke',grav:-10,grow:6,drag:.9});else spawnP(_sx2,_sy2,{vx:_tx2*rand(90,160)+Math.cos(_wa2)*40,vy:rand(-46,-14),life:rand(.35,.6),max:.6,color:Math.random()<.5?'#a98a54':'#d8c9a3',size:rand(1.8,3.4),shape:'shard',grav:150,rot:rand(0,6),vr:rand(-9,9),drag:.94})}} /* v84: whirlwind emission is locked to the SPIN ANGLE on an even 46/s accumulator — dust and debris spiral off the blade in step with the visible spin instead of popping at random angles */p.whirlTick=(p.whirlTick||0)+dt;{const _cwL=wlvl('cycloneblade'),_wTick=_cwL>=6?.13:_cwL>=3?.15:.18;if(p.whirlTick>_wTick){p.whirlTick=0;const _wR=118*skillAoe('s1')*(hasEvo('evoWhirl')?1.75:Math.pow(1.25,cntAt(_cwL,[3,6])))*(p.zoneMul||1),_wDmg=effDamage((hasEvo('evoWhirl')?.8:.55)*(p.whirlMul||1)*(1+(((p.treeSkillPct||{}).s1)||0)/100),'phys');enemies.slice().forEach(e=>{const _wd2=Math.hypot(e.x-p.x,e.y-p.y);if(_wd2<_wR+e.r)damageEnemy(e,_wDmg,'phys');else if((p.whirlRings||1)>1&&_wd2<_wR*1.5+e.r)damageEnemy(e,_wDmg,'phys')});p._whirlFxT=(p._whirlFxT||0)-_wTick;if(p._whirlFxT<=0){p._whirlFxT=.5;zoneTickFx(p.x,p.y,_wR,'#c9b18a')}}} /* v130 KING BIBLE / UNHOLY VESPERS: tick 0.18s -> 0.15s at L3 -> 0.13s at L6; radius +25% at L3/L6; concentric rings (L2/L5/L8) tick at 1.5x radius; evolved radius x1.75 (was +45%) and the pull-in is GONE - the spin simply never stops. v143: the whirlwind tick lands the shared ring-flash + burst beat, throttled to 0.5s so the 0.13s tick never floods the fx pool — the vortex itself is untouched */} /* v126 CYCLONE OF RUIN: the whirlwind pulls foes inward */ /* EVOLUTION Cyclone of Ruin ticks wider and heavier — v83: dust kicked up continuously while spinning */
@@ -3811,12 +3962,12 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
    if(e.hp<e.maxHp*.66&&!e.summoned66){e.summoned66=true;for(let i=0;i<bossSummonCount(bd.sum66[1]);i++){const m=spawnEnemy(false,bd.sum66[0]);if(m){m.x=e.x+rand(-60,60);m.y=e.y+rand(-40,40);m.px=m.x;m.py=m.y;m.rx=m.x;m.ry=m.y}}if(bd.summonToast)showToast(bd.summonToast)} /* v80: summon counts scale with floor + level (bossSummonCount) — roster base counts on F1/L1 */
    if(e.hp<e.maxHp*.33&&!e.summoned33){e.summoned33=true;for(let i=0;i<bossSummonCount(bd.sum33[1]);i++){const m=spawnEnemy(false,bd.sum33[0]);if(m){m.x=e.x+rand(-60,60);m.y=e.y+rand(-40,40);m.px=m.x;m.py=m.y;m.rx=m.x;m.ry=m.y}}}
    e.abilityCd-=dt;if(e.abilityCd<=0){e.abilityCd=bd.abCd;const _abDfD=difficulty==='hell'?(floorNum<=1?1.36:floorNum===2?1.43:1.50):difficulty==='nightmare'?(floorNum<=1?1.14:floorNum===2?1.19:1.24):1;const _abComp=mode==='bossrush'?bossHpCompound().dmg:Math.min(1.25,Math.pow(1.18,Math.min(bossCount||0,3)));const abDmg=Math.round(p.maxHp*.26*(bd.abDmg/55)*_abDfD*_abComp*(challenge==='greed'?1.3:1)); /* v120 VS CARBON-COPY, BOSS ABILITIES: telegraph damage is now computed DIRECTLY as a % of the hero's current max HP — the Dread Slam (roster 55) anchors at 26%, so Nova 48 -> 22.7%, Venom 34 -> 16.1%, Colossus Slam 62 -> 29.3%, Meteors 46 -> 21.7% on Dusk — scaled by the same boss difficulty ramp, Greed and repeat-boss compound as boss contact, and flagged preScaled at detonation so hurtPlayer applies armour to it without re-converting it. The old flat formula (base x (1 + .25/floor + .07/level) x compound) is DELETED: its level term double-scaled against the growing pool. */
-    if(bd.ab==='slam'||bd.ab==='bigslam'){teles.push({x:p.x,y:p.y,r:bd.abR,t:1,dmg:abDmg,el:'phys',hostile:true});sfx('bossab');if(bd.abToast)showToast(bd.abToast)}
-    else if(bd.ab==='nova'){teles.push({x:e.x,y:e.y,r:bd.abR,t:1.1,dmg:abDmg,el:'fire',hostile:true});ringFx(e.x,e.y,bd.abR,'#ff6a2a');sfx('bossab');if(bd.abToast)showToast(bd.abToast)}
-    else if(bd.ab==='venom'){for(let vi=0;vi<3;vi++)teles.push({x:p.x+rand(-80,80),y:p.y+rand(-60,60),r:bd.abR,t:.9,dmg:abDmg,el:'poison',hostile:true});sfx('bossab');if(bd.abToast)showToast(bd.abToast)}
-    else if(bd.ab==='meteors'){teles.push({x:p.x,y:p.y,r:bd.abR,t:1,dmg:abDmg,el:'fire',hostile:true,meteor:1});teles.push({x:p.x+rand(-110,110),y:p.y+rand(-80,80),r:bd.abR,t:1.15,dmg:abDmg,el:'fire',hostile:true,meteor:1});sfx('bossab');if(bd.abToast)showToast(bd.abToast)} /* v141: hostile meteors are flagged so the falling-rock visual draws for them (the nova shares el+hostile but is not a meteor) */
-    else if(bd.ab==='volley'){e.pendingVolley=.65;e.castT=.3;showToast('The Veilmother gathers the veil — VOLLEY incoming, keep moving!');ringFx(e.x,e.y,95,'#c9a2ff');sfx('bossab')} /* TELEGRAPH (P3 fix): the volley used to fire instantly — now a 0.65s gather with a ring and a warning first */
-    else if(bd.ab==='charge'){e.pendingCharge=.8;showToast('Gormaw paws the ground — CHARGE incoming!');ringFx(e.x,e.y,85,'#ffb27a');sfx('bossab')} /* TELEGRAPH (P3 fix): the 540-speed lunge used to fire instantly — now a pawing wind-up first. v102: wind-up 0.55s -> 0.8s (F6 exposure fix) — a slower kit (Druid 2.35, Paladin 2.2) can now clear the charge lane on foot inside the telegraph instead of spending the dash every 3.8s cycle */}
+    if(bd.ab==='slam'||bd.ab==='bigslam'){teles.push({x:p.x,y:p.y,r:bd.abR,t:1,dmg:abDmg,el:'phys',hostile:true});sfx('bossab',{ab:bd.ab});if(bd.abToast)showToast(bd.abToast)}
+    else if(bd.ab==='nova'){teles.push({x:e.x,y:e.y,r:bd.abR,t:1.1,dmg:abDmg,el:'fire',hostile:true});ringFx(e.x,e.y,bd.abR,'#ff6a2a');sfx('bossab',{ab:bd.ab});if(bd.abToast)showToast(bd.abToast)}
+    else if(bd.ab==='venom'){for(let vi=0;vi<3;vi++)teles.push({x:p.x+rand(-80,80),y:p.y+rand(-60,60),r:bd.abR,t:.9,dmg:abDmg,el:'poison',hostile:true});sfx('bossab',{ab:bd.ab});if(bd.abToast)showToast(bd.abToast)}
+    else if(bd.ab==='meteors'){teles.push({x:p.x,y:p.y,r:bd.abR,t:1,dmg:abDmg,el:'fire',hostile:true,meteor:1});teles.push({x:p.x+rand(-110,110),y:p.y+rand(-80,80),r:bd.abR,t:1.15,dmg:abDmg,el:'fire',hostile:true,meteor:1});sfx('bossab',{ab:bd.ab});if(bd.abToast)showToast(bd.abToast)} /* v141: hostile meteors are flagged so the falling-rock visual draws for them (the nova shares el+hostile but is not a meteor) */
+    else if(bd.ab==='volley'){e.pendingVolley=.65;e.castT=.3;showToast('The Veilmother gathers the veil — VOLLEY incoming, keep moving!');ringFx(e.x,e.y,95,'#c9a2ff');sfx('bossab',{ab:bd.ab})} /* TELEGRAPH (P3 fix): the volley used to fire instantly — now a 0.65s gather with a ring and a warning first */
+    else if(bd.ab==='charge'){e.pendingCharge=.8;showToast('Gormaw paws the ground — CHARGE incoming!');ringFx(e.x,e.y,85,'#ffb27a');sfx('bossab',{ab:bd.ab})} /* TELEGRAPH (P3 fix): the 540-speed lunge used to fire instantly — now a pawing wind-up first. v102: wind-up 0.55s -> 0.8s (F6 exposure fix) — a slower kit (Druid 2.35, Paladin 2.2) can now clear the charge lane on foot inside the telegraph instead of spending the dash every 3.8s cycle */}
    if(bossRef===e)ui('bossfill').style.width=clamp(e.hp/e.maxHp*100,0,100)+'%'}
   if(ehz&&ehz.kind!=='ice'&&!e.boss){e.hp-=(ehz.kind==='lava'?20:ehz.kind==='void'?12:7)*dt;if(e.hp<=0){killEnemy(e);continue}} /* hazards hurt the horde as well (boss is immune) */
   resolveEntity(e,ex0,ey0,Math.min(e.r||12,16)); /* no collision with the world — knockback carries foes as far as it carries them, and their loot lands where they fall, anywhere in the endless waste */
@@ -3857,7 +4008,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
    const top=g.magnet?640:380+260*clamp(1-d/Math.max(1,pickupR),0,1);
    g.sp=Math.min(top,(g.sp||200)+1500*dt);
    g.x+=ux*g.sp*dt;g.y+=uy*g.sp*dt;
-   if(d<24||Math.hypot(p.x-g.x,p.y-g.y)<24){gainXp(g.value);g.collected=true;pixelBurst(g.x,g.y-8,3,g.value>=25?'#c9a2ff':g.value>=5?'#7ec850':'#6ea8ff');if(g.value>=25)floater(g.x,g.y-20,'+'+g.value+' XP','#c9a2ff',13);sfx('gem');if(state!=='play')return} /* v144: gem collection reads — a small tier-coloured pixel burst on every pickup, a floater only on the big (25+) gems so a sweep doesn't flood the screen */
+   if(d<24||Math.hypot(p.x-g.x,p.y-g.y)<24){gainXp(g.value);g.collected=true;pixelBurst(g.x,g.y-8,3,g.value>=25?'#c9a2ff':g.value>=5?'#7ec850':'#6ea8ff');if(g.value>=25)floater(g.x,g.y-20,'+'+g.value+' XP','#c9a2ff',13);sfx('gem',{tier:g.value>=25?25:g.value>=5?5:1});if(state!=='play')return} /* v144: gem collection reads — a small tier-coloured pixel burst on every pickup, a floater only on the big (25+) gems so a sweep doesn't flood the screen */
   }else if(d<driftR){
    g.sp=0;const dsp=90+50*(1-d/driftR);g.x+=ux*dsp*dt;g.y+=uy*dsp*dt;
   }else{const _sp=screenPos(g.x,g.y);if(_sp.x<-40||_sp.x>W+40||_sp.y<-40||_sp.y>H+40){g.sp=0;g.x+=ux*GEM_DRIFT*dt;g.y+=uy*GEM_DRIFT*dt}else g.sp=0} /* v129 OFF-SCREEN DRIFT: a gem resting outside the visible screen drifts toward the hero at 75 px/s so it comes into view instead of sitting off-screen forever — drift only, never collection (collection still needs pickup radius / MAGNET) */}
@@ -3881,7 +4032,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
    const top=380+260*clamp(1-d/Math.max(1,pickupR),0,1);
    h.sp=Math.min(top,(h.sp||200)+1500*dt);
    h.x+=ux*h.sp*dt;h.y+=uy*h.sp*dt;
-   if((d<24||Math.hypot(p.x-h.x,p.y-h.y)<24)&&p.hp<p.maxHp){p.hp=Math.min(p.maxHp,p.hp+10);h.collected=true;pixelBurst(h.x,h.y-8,4,'#ff6a7a');floater(h.x,h.y-20,'+10 HP','#39d353',14);sfx('potion')}
+   if((d<24||Math.hypot(p.x-h.x,p.y-h.y)<24)&&p.hp<p.maxHp){p.hp=Math.min(p.maxHp,p.hp+10);h.collected=true;pixelBurst(h.x,h.y-8,4,'#ff6a7a');floater(h.x,h.y-20,'+10 HP','#39d353',14);sfx('heart')}
   }else if(d<driftR){
    h.sp=0;const dsp=90+50*(1-d/driftR);h.x+=ux*dsp*dt;h.y+=uy*dsp*dt;
   }else{const _sp=screenPos(h.x,h.y);if(_sp.x<-40||_sp.x>W+40||_sp.y<-40||_sp.y>H+40){h.sp=0;h.x+=ux*GEM_DRIFT*dt;h.y+=uy*GEM_DRIFT*dt}else h.sp=0}}
@@ -3890,7 +4041,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
     XP gem on the map is magnetised at once — the whole field scoops
     to the hero, however far it was left behind. */
  for(const mg of magnets){if(!mg.collected&&Math.hypot(mg.x-p.x,mg.y-p.y)<42){mg.collected=true;let n=0;for(const g of gems){if(!g.collected){g.magnet=true;g.sp=Math.max(g.sp||0,220);n++}}
-  pixelBurst(mg.x,mg.y-10,18,'#ff5a4a');ringFx(mg.x,mg.y,80,'#ff5a4a');sfx('chest');showToast(n>0?('MAGNET! '+n+' XP gem'+(n===1?'':'s')+' scoop'+(n===1?'s':'')+' across the realms toward you!'):'MAGNET! No loose XP gems on the map right now')}}
+  pixelBurst(mg.x,mg.y-10,18,'#ff5a4a');ringFx(mg.x,mg.y,80,'#ff5a4a');sfx('magnet');showToast(n>0?('MAGNET! '+n+' XP gem'+(n===1?'':'s')+' scoop'+(n===1?'s':'')+' across the realms toward you!'):'MAGNET! No loose XP gems on the map right now')}}
  magnets=magnets.filter(m=>!m.collected);
  drops=drops.filter(d=>!d.collected);
  const _wvP=(player&&player.whirlT>0)?player:null,_wvR=_wvP?175*skillAoe('s1'):0,_wvR2=_wvR*_wvR;
@@ -5179,7 +5330,7 @@ if(SAVE_CORRUPT)showCorruptionUI();else if(SAVE_RECOVERED)showToast('A damaged s
 /* Report a Bug: one delegated handler covers the HUD button (static),
    the pause-menu and main-menu buttons (rebuilt with every modal). */
 document.addEventListener('click',e=>{const b=e.target&&e.target.closest?e.target.closest('[data-bug-report]'):null;if(!b)return;e.preventDefault();reportBug()});
-try{window.reportBug=reportBug;window.buildBugReport=buildBugReport;window.__drAudio=()=>({ctx:AUD.ctx?AUD.ctx.state:'none',musTimer:!!AUD.musTimer,musOn:AUD.musOn,muted:AUD.muted,vol:AUD.vol,sfxVol:AUD.sfxVol,musVol:AUD.musVol,voices:AUD.voices})}catch(e){} /* audio diagnostic hook (v62): lets a live check confirm the context is running, the music timer is alive and milestone SFX actually spawn voices — the v61 soak could not verify audio by ear */
+try{window.reportBug=reportBug;window.buildBugReport=buildBugReport;window.__drAudio=()=>({ctx:AUD.ctx?AUD.ctx.state:'none',musTimer:!!AUD.musTimer,musOn:AUD.musOn,muted:AUD.muted,vol:AUD.vol,sfxVol:AUD.sfxVol,musVol:AUD.musVol,voices:AUD.vMus+AUD.vSfx,vMus:AUD.vMus,vSfx:AUD.vSfx})}catch(e){} /* audio diagnostic hook (v62): lets a live check confirm the context is running, the music timer is alive and milestone SFX actually spawn voices — the v61 soak could not verify audio by ear */
 const wEnter=ui('welcomeEnter');if(wEnter){wEnter.focus();wEnter.onclick=()=>{audEnsure();const w=ui('welcome');if(w)w.style.display='none';sfx('ui')}}
 const spdBtn=ui('speedBtn');if(spdBtn)spdBtn.onclick=()=>{audEnsure();cycleGameSpeed()};
 requestAnimationFrame(loop);
