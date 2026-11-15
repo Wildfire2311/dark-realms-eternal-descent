@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <link rel="icon" href="data:,">
 <title>Dark Realms: Eternal Descent — Isometric Dark Fantasy Roguelite</title>
@@ -253,6 +253,78 @@ a.bugMail:hover{background:#3b3020}
 .shopic{width:34px;height:34px;object-fit:contain;image-rendering:pixelated;vertical-align:middle;margin-right:6px}
 @media(max-width:700px){#title{display:none}#stats{width:208px;max-width:54vw}#bonusGrid{gap:1px 7px}#bonusGrid .brow{font-size:10px}#buffs .buffline{font-size:10px}#stats,#right{min-width:0;font-size:12px;padding:7px}#topbarRow{padding:4px 6px;gap:6px}#hpOrb{width:150px}#xpReadout{font-size:10px}#topTime{font-size:13px}.ability{width:40px;height:40px}.lvlchip{font-size:11px;padding:1px 9px 2px}#modal{padding:14px;-webkit-overflow-scrolling:touch}body{overflow:hidden}#aiWatchBtn{top:192px;font-size:12px;padding:6px 12px}#aiBar{top:230px;font-size:12px}#aiLog{top:266px;font-size:11px} /* v144: mobile AI stack moved below the top bar + boss bar */#credit{font-size:10px;right:10px}}
 @media(max-width:560px){#topbarRow{flex-wrap:wrap;height:auto;justify-content:center}#top{top:102px}#abilities{flex-wrap:wrap;max-width:224px;row-gap:5px}.ability{width:36px;height:36px}.ability img{width:24px;height:24px}.lvlchip{display:none}} /* v144: on narrow phones the top bar row wraps (hotbar drops to a second line) and #top drops to clear it */
+/* ---- v149 MOBILE LAYOUT FIX: phones only — every rule below sits behind a max-width / pointer:coarse / max-height gate, so desktop (>=921px wide, fine pointer, tall window) is unchanged. The v144/v61 mobile rules above still apply first; these blocks come later and override where they conflict (same specificity, later wins). Geometry targets: portrait 390x844, landscape 844x390 and 932x430. Layout math per block is in WORKER-NOTES.md. ---- */
+@media(max-width:920px){
+ #topbarRow{flex-wrap:wrap;height:auto;padding:4px calc(6px + env(safe-area-inset-right,0px)) 4px calc(6px + env(safe-area-inset-left,0px))}
+ #hotbarWrap{order:1}
+ #abilities{flex-wrap:wrap;max-width:none}
+ .ability{height:44px}
+ #top{top:140px;left:calc(16px + env(safe-area-inset-left,0px));right:calc(16px + env(safe-area-inset-right,0px))}
+ #stats .bsec,#stats #bonusGrid,#stats #buffs,#stats .bnote{display:none}
+ #bossbar{top:100px}
+ #toast{top:auto;bottom:calc(324px + env(safe-area-inset-bottom,0px));width:max-content;max-width:88vw;text-align:center}
+ #aiWatchBtn{top:auto;bottom:calc(156px + env(safe-area-inset-bottom,0px));font-size:12px;padding:6px 12px}
+ #aiBar{top:auto;bottom:calc(196px + env(safe-area-inset-bottom,0px));width:max-content;max-width:92vw;font-size:12px}
+ #aiLog{top:auto;bottom:calc(250px + env(safe-area-inset-bottom,0px));width:max-content;max-width:92vw;max-height:60px;overflow:hidden;font-size:11px}
+ #welcome{overflow-y:auto}
+ #welcome .wbox{margin:auto}
+ #modal{max-height:92vh;max-height:92dvh}
+ #fanfare{max-width:92vw;padding:14px 18px}
+ #evoFx,#rdFx{max-width:94vw;padding:12px 18px}
+}
+@media(max-width:700px){
+ button{padding:12px 16px}
+ .banishX{padding:10px 12px;font-size:17px}
+ #modal .card .cardhead{padding-right:52px}
+ #leftcol{flex:none}
+}
+@media(max-width:560px){
+ #hpOrb{width:120px}
+ #topTime{font-size:12px}
+ .ability{width:calc((100vw - 60px)/8)}
+ #evoFx .evoBig,#rdFx .evoBig{font-size:clamp(18px,5.5vw,32px)}
+ #welcome .wbox{padding:24px 18px 20px}
+ #toast{font-size:13px;padding:7px 12px}
+}
+@media(pointer:coarse),(max-width:860px){
+ #credit{display:none}
+ #joyBase{left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+ #tBtns{right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+ #joyBase span{bottom:8px}
+}
+@media(max-width:700px) and (max-height:780px){
+ #floorcond{display:none}
+ #speedBtn,#bugHudBtn{display:none}
+}
+@media(max-width:700px) and (max-height:860px){
+ #aiLog{display:none}
+ #toast{bottom:calc(241px + env(safe-area-inset-bottom,0px));font-size:12px}
+ #aiBar{font-size:11px}
+}
+@media(max-width:700px) and (max-height:728px){
+ #minimap{display:none}
+}
+@media(pointer:coarse) and (max-height:500px){
+ #stats,#minimap{display:none}
+ #title{display:none}
+ #top{top:100px;left:calc(16px + env(safe-area-inset-left,0px));right:calc(16px + env(safe-area-inset-right,0px))}
+ #topbarRow{flex-wrap:wrap;height:auto;padding:4px calc(6px + env(safe-area-inset-right,0px)) 4px calc(6px + env(safe-area-inset-left,0px))}
+ #abilities{flex-wrap:wrap}
+ .ability{height:44px}
+ #hotbarWrap{order:1}
+ #right{font-size:11px;padding:7px 10px}
+ #floorcond{display:none}
+ #speedBtn,#bugHudBtn{display:none}
+ #bossbar{top:100px;left:calc(16px + env(safe-area-inset-left,0px));transform:none;width:min(420px,52vw)}
+ #aiBar{top:140px;bottom:auto}
+ #aiLog{display:none}
+ #aiWatchBtn{top:auto;left:calc(16px + env(safe-area-inset-left,0px));right:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:none}
+ #toast{top:176px;bottom:auto;width:max-content;max-width:calc(52vw - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))}
+ #welcome{padding:12px}
+ #welcome .wbox{padding:20px 18px 16px}
+ #welcome h1{font-size:26px}
+ #welcomeEnter{margin:14px auto 4px;padding:12px 32px}
+}
 body.cb .r-Mythic{color:#ffffff}body.cb .b-Mythic{border-color:#ffffff!important;box-shadow:0 0 12px rgba(255,255,255,.55)} /* v141 CB: Mythic was #ffd94a — Rare's exact colour. White now, with the diamond marker below */
 body.cb .r-Set{color:#2dd4bf}body.cb .b-Set{border-color:#2dd4bf!important}body.cb .r-Ancient{color:#f472b6}body.cb .b-Ancient{border-color:#f472b6!important} /* v141 CB: Set was #6ea8ff — Magic's exact colour; Ancient was #ff9a3a — a breath from Legendary's #ff8a2a. Teal and magenta now, with borders to match */
 body.cb .r-Common::before{content:'○ '}body.cb .r-Magic::before{content:'◇ '}body.cb .r-Rare::before{content:'★ '}body.cb .r-Set::before{content:'▲ '}body.cb .r-Unique::before{content:'● '}body.cb .r-Legendary::before{content:'✦ '}body.cb .r-Ancient::before{content:'⬣ '}body.cb .r-Mythic::before{content:'◆ '}body.cb .r-Relic::before{content:'✧ '} /* v141 CB: a non-colour marker per rarity — colour is never the only signal */
@@ -343,7 +415,7 @@ function loadValidated(k,def,isValid){
 const isArr=v=>Array.isArray(v),isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v),isNum=v=>typeof v==='number'&&isFinite(v);
 function collectSaveData(){const out={_saveVersion:SAVE_VERSION,_gameVersion:(typeof GAME_VERSION!=='undefined'?GAME_VERSION:'')};['dr2_meta','dr2_records','dr2_uid','dr2_speed'].forEach(k=>{try{const raw=localStorage.getItem(k);if(raw!=null)out[k]=JSON.parse(raw)}catch(e){}});return out}
 /* ---- Report a Bug: version stamp + recent-error capture (no personal data) ---- */
-const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v148 (2026-11-12). v148 THE AI PILOT REWORK \u2014 Watch AI Play rebuilt: density-aware disengage, loot discipline, dash as a tool, the Red Death flee fix, boss-aware positioning, synergy level-up picks with reroll/skip/banish, shrine-seeking when hurt, and a Red Death endgame. Pilot only \u2014 no gameplay changes.";
+const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v149 (2026-11-15). v149 MOBILE LAYOUT FIX \u2014 the phone HUD rebuilt so nothing overlaps: the top bar wraps cleanly with a one-row hotbar, the boss bar and panels sit in their own lanes, toasts and the Watch AI stack dock above the touch controls, and every edge control respects the notch and home-bar safe areas. Layout only \u2014 no gameplay changes.";
 const BUG_ERRORS=[];
 function bugNoteError(msg){try{const s=String(msg==null?'Unknown error':msg).slice(0,300);BUG_ERRORS.push(new Date().toISOString()+' — '+s);if(BUG_ERRORS.length>10)BUG_ERRORS.shift()}catch(e){}}
 try{addEventListener('error',e=>{bugNoteError((e&&e.message)||'Script error')});addEventListener('unhandledrejection',e=>{const r=e&&e.reason;bugNoteError('Unhandled promise rejection: '+((r&&r.message)||r||'unknown'))})}catch(e){}
