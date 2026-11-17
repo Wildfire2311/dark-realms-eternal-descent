@@ -415,7 +415,7 @@ function loadValidated(k,def,isValid){
 const isArr=v=>Array.isArray(v),isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v),isNum=v=>typeof v==='number'&&isFinite(v);
 function collectSaveData(){const out={_saveVersion:SAVE_VERSION,_gameVersion:(typeof GAME_VERSION!=='undefined'?GAME_VERSION:'')};['dr2_meta','dr2_records','dr2_uid','dr2_speed'].forEach(k=>{try{const raw=localStorage.getItem(k);if(raw!=null)out[k]=JSON.parse(raw)}catch(e){}});return out}
 /* ---- Report a Bug: version stamp + recent-error capture (no personal data) ---- */
-const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v150 (2026-11-16). v150 THE WEAPONS REWORK \u2014 all 27 weapons reworked: Ashen Blade, Frostfist, Thornseed Staff, Exhumation Wand, Firstlight Mace, Skyfall Bow, Venomfang, Shadowfang Gauntlets, Slowburn, Gravebind, Rolling Sun, Storm Rod, Glacier Orb, Cyclone Blade, Howling Charm, Venom Vial, Judgment Hammer, Corpse Charge, Beacon Lantern, Ramshot Bow, Choir of the Deep, Mirror Diamond, Rimehold, Bastion Oath, Reaper\u2019s Tithe, Legion Blade, Threadneedle.";
+const GAME_VERSION="Dark Realms: Eternal Descent \u2014 build v151 (2026-11-17). v151 MAP OVERHAUL \u2014 one endless uniform floor (Blood Moor): the other five zones, all hazard pools and the tomb clutter are gone; the Destination picker is removed.";
 const BUG_ERRORS=[];
 function bugNoteError(msg){try{const s=String(msg==null?'Unknown error':msg).slice(0,300);BUG_ERRORS.push(new Date().toISOString()+' — '+s);if(BUG_ERRORS.length>10)BUG_ERRORS.shift()}catch(e){}}
 try{addEventListener('error',e=>{bugNoteError((e&&e.message)||'Script error')});addEventListener('unhandledrejection',e=>{const r=e&&e.reason;bugNoteError('Unhandled promise rejection: '+((r&&r.message)||r||'unknown'))})}catch(e){}
@@ -488,10 +488,11 @@ function auBell(f,dur,vol,at,bus){auTone({f:f,dur:dur,vol:vol,at:at,bus:bus,type
    or samples are used. The v70 engine was a meditation: one 4-chord
    loop per zone, 6-second sparse bars, the same 24 seconds for a
    30-minute run. The v145 score is built for a survivor-like:
-   - SIX COMPOSED TRACKS, one per zone: 32-chord progressions in four
-     8-chord sections (A / B / A' / peak), ~3.2 minutes of harmonic
-     content per zone before anything repeats. Each zone also has its
-     own RIFF — a 4-note motif the figure plays at higher intensity,
+   - ONE COMPOSED TRACK (v151: the six zone scores are gone with their
+     zones — Blood Moor's A-minor track is the whole score): a 32-chord
+     progression in four 8-chord sections (A / B / A' / peak), ~3.2
+     minutes of harmonic content before anything repeats. It carries
+     its own RIFF — a 4-note motif the figure plays at higher intensity,
      transposed to the chord — and its own drum character.
    - A DRIVING PULSE: 12 pulse slots per bar (120 BPM at 1x), a plucked
      bass on the beat, frame drums in the field (not just at bosses),
@@ -533,12 +534,12 @@ function auMetal(f,dur,vol,at,bus){if(!AUD.ctx)return;const t0=at||AUD.ctx.curre
  [[1,1],[2.76,.5],[5.40,.24],[8.93,.10]].forEach(function(p){auTone({f:f*p[0]*(1+(Math.random()-.5)*.004),dur:dur*(1.1-p[0]*.09),vol:vol*p[1],at:t0,bus:bus,type:'sine',imp:1})})}
 /* One chord per bar; AU_BAR is the 1x bar length (auTempoMul scales it
    with game speed — see below). prog chords: b = bass offset in
-   semitones from the zone root, n = pluckable chord tones in semitones
+   semitones from the track root, n = pluckable chord tones in semitones
    ABOVE THE CHORD'S OWN BASS (scheduleBar sounds them as
-   bassF*2^(n/12), so the voicing rides the bass). Every zone runs a
+   bassF*2^(n/12), so the voicing rides the bass). The track runs a
    32-chord progression in four 8-chord sections (A / B / A' / peak) —
-   ~3.2 minutes of harmonic content per zone at 1x, not a 24-second
-   loop. Each zone also carries its own RIFF (a 4-note motif, semitone
+   ~3.2 minutes of harmonic content at 1x, not a 24-second
+   loop. It also carries its own RIFF (a 4-note motif, semitone
    offsets above the chord root, played by the figure at higher
    intensity) and its own DRUMS character (0 sparse, 1 standard,
    2 driving). All minor-key, wide, and unresolved — the descent never
@@ -551,32 +552,7 @@ const ACT_MUSIC=[
   [0,'m'],[3,'M'],[8,'M'],[10,'M'],[0,'m'],[3,'M'],[8,'M'],[10,'M'],
   [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[8,'M'],[5,'m'],[7,'M'],
   [0,'m'],[3,'M'],[8,'M'],[10,'M'],[0,'m'],[3,'M'],[5,'m'],[7,'M'],
-  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[10,'M'],[8,'M'],[7,'M']])},
- {root:73.42,riff:[12,7,3,0],drums:0,prog:auProg([ /* Catacombs (D minor): darker, chromatic ii° — falling riff, sparse drums, the drips carry it */
-  [0,'m'],[5,'m'],[8,'M'],[7,'M'],[0,'m'],[5,'m'],[8,'M'],[7,'M'],
-  [0,'m'],[8,'M'],[2,'dim'],[7,'M'],[0,'m'],[5,'m'],[3,'M'],[10,'M'],
-  [0,'m'],[5,'m'],[8,'M'],[7,'M'],[0,'m'],[8,'M'],[3,'M'],[7,'M'],
-  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[5,'m'],[7,'M'],[0,'m']])},
- {root:82.41,riff:[0,7,3,12],drums:1,prog:auProg([ /* Cursed Forest (E minor): folk-minor — open-leap riff, standard drums */
-  [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[8,'M'],[3,'M'],[10,'M'],
-  [0,'m'],[3,'M'],[10,'M'],[8,'M'],[0,'m'],[5,'m'],[7,'M'],[10,'M'],
-  [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[3,'M'],[5,'m'],[7,'M'],
-  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[10,'M'],[8,'M'],[7,'M']])},
- {root:92.50,riff:[0,12,7,3],drums:2,prog:auProg([ /* Frozen Wasteland (F# minor): cold, wide, minor-V — wide riff, driving drums */
-  [0,'m'],[7,'m'],[8,'M'],[3,'M'],[0,'m'],[7,'m'],[8,'M'],[3,'M'],
-  [0,'m'],[8,'M'],[5,'m'],[7,'m'],[0,'m'],[3,'M'],[10,'M'],[7,'m'],
-  [0,'m'],[7,'m'],[8,'M'],[3,'M'],[0,'m'],[8,'M'],[5,'m'],[7,'M'],
-  [0,'m'],[10,'M'],[7,'m'],[8,'M'],[0,'m'],[10,'M'],[7,'M'],[0,'m']])},
- {root:65.41,riff:[0,0,7,12],drums:2,prog:auProg([ /* Demonic Fortress (C minor): heavy, V-driven — pedal-tone riff, driving drums */
-  [0,'m'],[7,'M'],[8,'M'],[7,'M'],[0,'m'],[7,'M'],[8,'M'],[7,'M'],
-  [0,'m'],[8,'M'],[3,'M'],[10,'M'],[0,'m'],[5,'m'],[7,'M'],[7,'M'],
-  [0,'m'],[7,'M'],[8,'M'],[7,'M'],[0,'m'],[8,'M'],[5,'m'],[7,'M'],
-  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[10,'M'],[8,'M'],[7,'M']])},
- {root:49.00,riff:[0,3,0,7],drums:0,prog:auProg([ /* The Abyss (G minor): lowest, doom — tread riff, slow sparse drums */
-  [0,'m'],[5,'m'],[0,'m'],[7,'M'],[0,'m'],[5,'m'],[0,'m'],[7,'M'],
-  [0,'m'],[8,'M'],[5,'m'],[7,'M'],[0,'m'],[3,'M'],[10,'M'],[7,'M'],
-  [0,'m'],[5,'m'],[0,'m'],[7,'M'],[0,'m'],[8,'M'],[3,'M'],[7,'M'],
-  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[5,'m'],[7,'M'],[0,'m']])}];
+  [0,'m'],[10,'M'],[8,'M'],[7,'M'],[0,'m'],[10,'M'],[8,'M'],[7,'M']])}]; /* v151 MAP OVERHAUL: ONE composed track — the other five zone scores (Catacombs, Forest, Frozen, Fortress, Abyss) are deleted with their zones; Blood Moor's A-minor track is the whole score now */
 /* v145 TEMPO FOLLOWS GAME SPEED: the score's tempo multiplier is
    √gameSpeed — 1x at 1x, ~1.41x at 2x, ~1.73x at 3x (a 120 BPM pulse
    becomes ~208 BPM at 3x). A literal 3x tempo (360 BPM) would blur
@@ -608,7 +584,7 @@ function musicTick(){if(!AUD.ctx)return;const ac=AUD.ctx;
  AUD.musBus.gain.setTargetAtTime(cut?0:(AUD.musOn?(inGame?.6:.4)*(AUD.musVol/.8):0),ac.currentTime,cut?.06:.8);
  while(AUD.nextBar<ac.currentTime+1.8){scheduleBar(AUD.nextBar);AUD.nextBar+=auBarLen();AUD.barIdx++}
  ambTick()}
-function scheduleBar(t0){const cfg=ACT_MUSIC[zoneIdx]||ACT_MUSIC[0],inten=AUD.intensity,chord=cfg.prog[AUD.barIdx%cfg.prog.length];
+function scheduleBar(t0){const cfg=ACT_MUSIC[0],inten=AUD.intensity,chord=cfg.prog[AUD.barIdx%cfg.prog.length];
  const BL=auBarLen(),SL=BL/12; /* 12 pulse slots per bar — a 120 BPM pulse at 1x, ~208 BPM at 3x */
  const bassF=cfg.root*Math.pow(2,chord.b/12),R=Math.random;
  const quiet=state==='menu'||state==='gallery';
@@ -656,13 +632,10 @@ function ambStart(){if(!AUD.ctx||AUD.windGain)return;const ac=AUD.ctx;
  src.connect(AUD.windFilter);AUD.windFilter.connect(AUD.windGain);AUD.windGain.connect(AUD.ambBus);src.start();
  const lfo=ac.createOscillator();lfo.frequency.value=.07;const lg=ac.createGain();lg.gain.value=.012;lfo.connect(lg);lg.connect(AUD.windGain.gain);lfo.start();
  const lfo2=ac.createOscillator();lfo2.frequency.value=.045;const lg2=ac.createGain();lg2.gain.value=130;lfo2.connect(lg2);lg2.connect(AUD.windFilter.frequency);lfo2.start()}
-function ambTick(){if(!AUD.ctx||!AUD.windGain)return;const ac=AUD.ctx,z=zoneIdx;
- let wg=.028,wf=380;
- if(z===1){wg=.006;wf=200}else if(z===3){wg=.05;wf=650}else if(z===4){wg=.02;wf=240}else if(z===2){wg=.038;wf=480}
+function ambTick(){if(!AUD.ctx||!AUD.windGain)return;const ac=AUD.ctx;
+ let wg=.028,wf=380; /* v151: one floor, one wind — the zone branches (Catacombs drips, Fortress rumble, Frozen/Forest winds) are deleted with their zones; Blood Moor's defaults remain */
  AUD.windGain.gain.setTargetAtTime(wg*(AUD.sfxVol/.9),ac.currentTime,1.2); /* AMBIENCE IS NOT MUSIC (P2 fix): the wind lives on the ambience/SFX side, so turning Music Off no longer kills the wind — it follows the SFX volume instead */
  AUD.windFilter.frequency.setTargetAtTime(wf,ac.currentTime,1.2);
- if(z===1&&Math.random()<.16){const t=ac.currentTime+.05;auTone({f:1150,f2:340,dur:.16,vol:.05,at:t,bus:AUD.ambBus});auTone({f:1150,f2:340,dur:.16,vol:.028,at:t+.28,bus:AUD.ambBus})}
- if(z===4&&Math.random()<.12)auTone({f:rand(90,150),f2:50,dur:.3,vol:.05,bus:AUD.ambBus});
  AUD.ambBellT-=.3;
  if(AUD.ambBellT<=0){AUD.ambBellT=18+Math.random()*25;auBell(196,4,.026,ac.currentTime+.1,AUD.ambBus)}}
 /* ---------------- SFX: combat, spells, deaths, feedback ----------------
@@ -976,10 +949,24 @@ function deriveFoeFrames(e){if(e.derived)return;const img=e.frames[0];if(!img||!
    fit the box, and heroPoseCheck() above guards it from now on. */
 ['Barbarian','Sorceress','Druid','Necromancer','Paladin','Amazon','Assassin','Nightwyrm','Pyromancer'].forEach(cls=>{
  regSprite('hero_'+cls,['idle','walk','walkb','attack','cast','idle'].map(p=>'hero_'+cls+'_'+p+'.png'))});
-/* generated pixel-art ground props (assets/sprites/prop_*.png) */
-const PROP_FILES={tomb:['prop_tomb0.png','prop_tomb1.png'],pillar:['prop_pillar0.png','prop_pillar1.png','prop_pillar2.png'],tree:['prop_tree0.png']};
+/* ground props (assets/sprites/prop_*.png) — the old pixel-art set plus the v151 painterly Moor landmarks */
+const PROP_FILES={pillar:['prop_pillar0.png','prop_pillar1.png','prop_pillar2.png'],tree:['prop_moor_tree.png'],chapel:['prop_moor_chapel.png'],stones:['prop_moor_stones.png'],obelisk:['prop_moor_obelisk.png']}; /* v151: the tomb sprites are deleted with the tomb prop — pillar stays (the shrine visual uses prop_pillar1). 'tree' is RE-TYPED to the new painterly dead tree (prop_tree0.png stays on disk, dormant, never spawned) and chapel / stones / obelisk are new landmark types. */
 const PROP_IMG={};
 function propImages(type){if(PROP_IMG[type])return PROP_IMG[type];const arr=(PROP_FILES[type]||[]).map(f=>{const im=new Image();im.src='assets/sprites/'+f;return im});PROP_IMG[type]=arr;return arr}
+/* v151 LANDMARKS — sparse navigation anchors on the endless Moor floor.
+   Draw width by type (hero is 105px tall; the old dressing props drew
+   64px wide, trees 86px — landmarks are bigger because they are
+   navigation, not dressing): chapel 190, stones 170, tree 110,
+   obelisk 64 (tall and thin — width stays small while height reaches
+   ~187px). ONE shared rule, read by BOTH draw paths (Canvas + Pixi);
+   unknown types fall back to the old 64px dressing width. */
+const PROP_WIDTH={chapel:190,stones:170,tree:110,obelisk:64};
+function propWidth(type){return PROP_WIDTH[type]||64}
+/* Landmark type weights for the placement pick (shared by the chunk
+   generator and the start-clearing generator): the tree is the common
+   one, the chapel the rarest. */
+const LANDMARK_MIX=[['tree',.45],['stones',.25],['obelisk',.20],['chapel',.10]];
+function pickLandmarkType(r){let acc=0;for(const [t,w] of LANDMARK_MIX){acc+=w;if(r<acc)return t}return LANDMARK_MIX[0][0]}
 ['Skeleton','Zombie','Fallen','Wraith','Demon','Archer','Cultist','Spider','Beast','Knight','DreadKnight','Elite'].forEach(t=>{
  const f='foe_'+t+'.png';regSprite('foe_'+t,[f,f,f,f,f,f],true)});
 /* v144 NAMED-BOSS SPRITES: the five roster bosses with their own art — Malgorath (Demon), Sythra (Spider), Karghul (Skeleton), Veilmother (Wraith), Gormaw (Beast). Dread Knight already has foe_DreadKnight.png; Vexhar (Cultist) keeps the scaled trash sprite. The draw code keys by foe_<type>, so BOSS_SPRITE (next to BOSS_ROSTER) overrides by bossKey. */
@@ -1332,13 +1319,12 @@ const EVO_FULL={ashblade:'The Grey Pall is the Blinding Ash form: every cleave t
 const evoLineW=def=>def&&def.evo?'<span class="evoline">◆ Evolves into '+def.evo+' — '+(EVO_DO[def.id]||'')+'</span>':'';
 const evoLineP=(pd,held)=>{const wd=pd?weaponById(pd.weapon):null;return wd&&wd.evo?'<span class="evoline">◆ '+(held?'Completes ':'Pairs with ')+wd.name+' → '+wd.evo+' — '+(EVO_DO[wd.id]||'')+'</span>':''};
 const PASSIVE_DO={bloodrage:'Your ash blinds longer and reaches further',arcanesigil:'Your chill bites deeper',thornsigil:'Your poison bites harder and lasts longer',gravesigil:'Bone eruptions spread wider · Lv 3 & 5: +1 spike',sigilhours:'Every lingering effect you create lasts longer',huntersigil:'Your projectiles fly faster',fortunecoin:'Your plague spreads further and faster',shadowsigil:'Brands last longer; branded foes take more damage',graveplate:'Your Burning stacks load faster',doomsigil:'Your chains bind more foes and carry more of each blow',soulcrown:'Your Rolling Sun rolls further',hollowtome:'All your weapons recharge faster',emberlens:'Your attacks cover a wider area',bloodheart:'Your cyclone pulls harder and roams further',packsigil:'Allies hit harder \u00b7 Lv 3 & 5: +1 ally',poultice:'Your venom coats deeper — foes are easier to shove and freeze',lodestone:'Luck rises — and your returning hammers crit more often',corpsesigil:'Every explosion hits harder \u00b7 Lv 5: blasts chain once more',wispsigil:'Zone weapons grow wider \u00b7 your beacon beam sweeps faster',twinsigil:'Every projectile weapon fires one more shot',hymnsigil:'Your canticle wave travels faster',echosigil:'Your mirror tree reaches further and lives longer',windsigil:'Foes you freeze stay frozen longer',aegissigil:'Your shields return faster and shove harder — and your brief immunity after a hit lasts longer',tithesigil:'More gold from every foe',veteransigil:'Your retaliation hits harder',snaresigil:'Slowed, rooted or frozen foes take more damage',muspellsigil:'Your fire hits harder',spectralsigil:'Crit more often \u2014 and crits bloom a second zone',chaossigil:'Your dash comes back faster',seraphsigil:'Your holy light hits harder',prismsigil:'Your critical hits hit harder',vespersigil:'Foes that strike you are stung back',gaeasigil:'Foes standing in your zones take more damage',cathedralsigil:'Your orbiting and zone weapons hit harder'};
-const ZONES=[
-{name:'Blood Moor',tileA:'#202a22',tileB:'#1b251f',speck:'#39402c',crack:'#141c16',bg:'#101710',prop:'tomb',accent:'#5a6b4a'},
-{name:'Ancient Catacombs',tileA:'#2a2a2e',tileB:'#232327',speck:'#3d3d44',crack:'#17171b',bg:'#0d0d10',prop:'pillar',accent:'#8a8578'},
-{name:'Cursed Forest',tileA:'#1d2b1a',tileB:'#17240f',speck:'#33482a',crack:'#101a0c',bg:'#0b1208',prop:'tree',accent:'#3f7a4a'},
-{name:'Frozen Wasteland',tileA:'#26313a',tileB:'#1f2931',speck:'#42586a',crack:'#141d24',bg:'#0a0f14',prop:'shard',accent:'#7fb7d9'},
-{name:'Demonic Fortress',tileA:'#2e1a16',tileB:'#251310',speck:'#4c2a20',crack:'#180a07',bg:'#0e0605',prop:'lava',accent:'#ff6a2a'},
-{name:'The Abyss',tileA:'#2a1f38',tileB:'#211830',speck:'#453364',crack:'#150e20',bg:'#070410',prop:'shard',accent:'#9a6ad9'}];
+/* v151 MAP OVERHAUL: ONE endless uniform floor — the six-zone table is
+   gone. Blood Moor is the whole world now: a single floor definition
+   (name / minimap checker / background) the renderers read directly.
+   The dead fields (speck / crack / accent / prop) died with the table;
+   zoneIdx is deleted outright (see the v151 cleanup report). */
+const FLOOR={name:'Blood Moor',tileA:'#202a22',tileB:'#1b251f',bg:'#101710'};
 const DIFFS={normal:{label:'Dusk',hp:1,dmg:1,loot:0},nightmare:{label:'Gloom',hp:1.45,dmg:1.33,loot:6},hell:{label:'Nightfall',hp:2.35,dmg:1.86,loot:12}}; /* v104 DIFFICULTY SMOOTHING (Monte Carlo QA v103, problem 4): headline multipliers eased — Gloom hp 1.55 -> 1.45 / dmg 1.45 -> 1.33, Nightfall hp 2.6 -> 2.35 / dmg 2.1 -> 1.86 — and spawnEnemy now RAMPS trash hp/damage and boss hp/damage up to these headlines over floors 1-3 instead of landing most of the weight early. Gloom/Nightfall completion was 0% for EVERY class at v103 while Dusk sat saturated at the top; Dusk is byte-identical here, and Nightfall stays strictly harder than Gloom at every floor on every axis (see the ramps in spawnEnemy) */
 const MODES={adventure:{label:'Adventure — one 30-minute arena, Red Death at 30:00'},survival:{label:'Survival — outlast the arena'},endless:{label:'Endless Dungeon — the waste without end'}};
 const FLOOR_CONDITIONS=[
@@ -1612,7 +1598,7 @@ function saveAll(){try{meta.gold=0}catch(e){} /* v92: saves NEVER carry gold —
 let _saveTimer=0;function saveAllSoon(){if(_saveTimer)return;_saveTimer=setTimeout(()=>{_saveTimer=0;saveAll()},300)}
 /* ---------------- run state (prototype names preserved) ---------------- */
 let state='menu',player=null,enemies=[],shots=[],eruptQueue=[],gems=[],drops=[],magnets=[],coins=[],hearts=[],particles=[],floaters=[],allies=[],legionnaires=[],fx=[],teles=[],zonesFx=[],decals=[],embers=[],threads=[],graveFuses=[],graveChain=null,keys={},elapsed=0,floorElapsed=0,spawnClock=0,attackClock=0,bossSpawned=false,killCount=0,gold=0 /* v92: every session starts at 0 gold — no purse is ever loaded */,wave=1,toastTimer=0,last=0; /* v144: coins + hearts are ground pickups now (gold drops as coins, Reaper's Tithe drops real hearts — both magnetized like gems); bagFullNoteT is DELETED (D4 — declared but never read since the backpack went away) */ /* v150 EXHUMATION: eruptQueue — the pending bone spikes, each a foe-tracked entry counting down its 0.05s stagger before it bursts */
-let camera={x:0,y:0},mode='adventure',difficulty='normal',zoneIdx=0,floorNum=1,bossRef=null,bossCount=0,bossIntermission=0,runShards=0,deathBanked=false,deathEarned=0,selItemId=null,hudClock=0,earlyItemDone=false,onboardStep=0; /* deathBanked: run rewards bank EXACTLY ONCE — re-renders of the death screen must never re-bank (see gameOver) */
+let camera={x:0,y:0},mode='adventure',difficulty='normal',floorNum=1,bossRef=null,bossCount=0,bossIntermission=0,runShards=0,deathBanked=false,deathEarned=0,selItemId=null,hudClock=0,earlyItemDone=false,onboardStep=0; /* v151: zoneIdx is DELETED — one floor, no zone state. deathBanked: run rewards bank EXACTLY ONCE — re-renders of the death screen must never re-bank (see gameOver) */
 /* ---- RUN END (v106) ---- there is no gear and no extraction any
    more: a run's build (weapons / passives) simply ends with the run.
    Paragon, Relics, the Build Codex and records are
@@ -1692,11 +1678,11 @@ let props=[];
    like a place instead of a void:
    · The floor is painted from world coordinates in drawWorld
      (viewport-sized sweep): each cell draws one tile of the
-     12-tile dungeon tileset (assets/tiles/), picked from the act's
+     12-tile dungeon tileset (assets/tiles/), picked from the floor's
      weighted mix by a world hash, so the ground continues
-     seamlessly forever with per-act variation.
-   · Dressing — trees / tombs / pillars / shards and hazard pools —
-     is generated deterministically per 900-unit CHUNK around the
+     seamlessly forever.
+   · Dressing — sparse landmark props — is generated
+     deterministically per 900-unit CHUNK around the
      traveller (see genChunk below): the same chunk always grows the
      same dressing, chunks far behind are forgotten, and none of it
      ever blocks movement.
@@ -1728,14 +1714,7 @@ let props=[];
    where it fell, waiting.
    ===================================================================== */
 const CELL=100,MW=Math.ceil(world.w/CELL),MH=Math.ceil(world.h/CELL);
-let mapGrid=null,mapRooms=[],hazards=[],poi={},spawnPt=null,mmStatic=null,mmCtx=null;
-const LAYOUTS=[
- {rooms:9,rw:[4,8],rh:[4,7],corr:2,style:'ruin',hazard:'poison',pools:3,courtyard:true},
- {rooms:13,rw:[3,5],rh:[3,5],corr:1,style:'crypt',hazard:'poison',pools:2},
- {rooms:11,rw:[4,7],rh:[4,6],corr:2,style:'trees',hazard:'poison',pools:4},
- {rooms:11,rw:[4,6],rh:[4,6],corr:2,style:'ice',hazard:'ice',pools:5},
- {rooms:10,rw:[4,7],rh:[4,7],corr:2,style:'fortress',hazard:'lava',pools:0,channel:true},
- {rooms:12,rw:[3,6],rh:[3,6],corr:1,style:'abyss',hazard:'void',pools:4}];
+let mapGrid=null,mapRooms=[],poi={},spawnPt=null,mmStatic=null,mmCtx=null; /* v151: hazards[] is DELETED with the hazard system (both generation sites, the query and both damage ticks are gone) */
 function cellAt(wx,wy){return 1} /* endless: every point of the world is floor — there is no "outside the map" for anything to rest in or be exiled to */
 function solidAt(wx,wy){return false}
 function gridSet(cx,cy,v){if(cx>=0&&cy>=0&&cx<MW&&cy<MH)mapGrid[cy*MW+cx]=v}
@@ -1747,34 +1726,37 @@ function snapToFloor(o,r){/* no-op in the endless realms: there is no off-floor 
    it is the identity: drops rest at the death spot, unmoved forever */
 function lootPos(x,y){return nearestFloor(x,y)}
 function losClear(x1,y1,x2,y2){return true} /* no walls, no blocked sight lines — shots and spells fly anywhere */
-function hazardAt(x,y){for(const hz of hazards){const dx=x-hz.x,dy=y-hz.y;if(dx*dx+dy*dy<hz.r*hz.r)return hz}
- const ch=genChunk(Math.floor(x/CHUNK),Math.floor(y/CHUNK));for(const hz of ch.hazards){const dx=x-hz.x,dy=y-hz.y;if(dx*dx+dy*dy<hz.r*hz.r)return hz}return null}
 /* ---------------- endless dressing: deterministic chunks ----------------
    The waste beyond the starting clearing is dressed chunk by chunk.
-   A chunk's dressing is a pure function of its coordinates and the
-   act (seeded RNG), so the same ground always looks the same when
-   revisited, with zero storage. Chunks are generated on demand around
-   the camera / the hero and forgotten once far behind, so memory
-   stays flat no matter how far anyone travels. Dressing is decor
-   only — props have no collision and hazards are ground effects. */
+   A chunk's dressing is a pure function of its coordinates (seeded
+   RNG), so the same ground always looks the same when revisited, with
+   zero storage. Chunks are generated on demand around the camera /
+   the hero and forgotten once far behind, so memory stays flat no
+   matter how far anyone travels. Dressing is decor only — props have
+   no collision. */
 const CHUNK=900;const chunks=new Map();
-function chunkSeeded(cx,cy){let h=(Math.imul(cx,374761393)+Math.imul(cy,668265263))^(Math.imul(zoneIdx+1,974711))^0x9e3779b9;return()=>{h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296}}
+function chunkSeeded(cx,cy){let h=(Math.imul(cx,374761393)+Math.imul(cy,668265263))^0x9e3779b9;return()=>{h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296}} /* v151: the zoneIdx salt is deleted — one floor, one seed space (deterministic patterns reshuffle once, cosmetic only) */
 function genChunk(cx,cy){const key=cx+','+cy;const got=chunks.get(key);if(got)return got;
- const rng=chunkSeeded(cx,cy),L=LAYOUTS[zoneIdx]||LAYOUTS[0],z=ZONES[zoneIdx],ch={props:[],hazards:[]};
- const np=4+Math.floor(rng()*4);
- for(let i=0;i<np;i++)ch.props.push({x:cx*CHUNK+rng()*CHUNK,y:cy*CHUNK+rng()*CHUNK,type:z.prop,v:Math.floor(rng()*4),ph:rng()*6.28});
- /* an occasional loose scatter of extra dressing — individual props
-    dropped at unrelated spots, never in a row: a line of props read
-    as a barrier / map edge, and there are no edges out here */
- if(rng()<.4){const n=2+Math.floor(rng()*3);for(let i=0;i<n;i++)ch.props.push({x:cx*CHUNK+rng()*CHUNK,y:cy*CHUNK+rng()*CHUNK,type:z.prop,v:Math.floor(rng()*4),ph:rng()*6.28})}
- if(rng()<.55){const hx=cx*CHUNK+CHUNK*(.25+rng()*.5),hy=cy*CHUNK+CHUNK*(.25+rng()*.5);
-  if(!(spawnPt&&Math.hypot(hx-spawnPt.x,hy-spawnPt.y)<260)){const n=3+Math.floor(rng()*3);for(let j=0;j<n;j++)ch.hazards.push({x:hx+(rng()-.5)*150,y:hy+(rng()-.5)*150,r:42+rng()*20,kind:L.hazard})}}
+ const rng=chunkSeeded(cx,cy),ch={props:[]}; /* v151: the LAYOUTS/ZONES locals are deleted with their tables, and the tomb scatter (4–7 props + 40% extra) and the hazard-cluster block are BOTH deleted — the chunk starts empty and grows at most ONE sparse landmark below. */
+ /* v151 LANDMARKS (chunk site): at most one landmark per chunk, in 8%
+    of chunks — a screen covers ~3x3 chunks, so ~0.7 landmarks per
+    screen, about one per 1-2 screens. The 3x3 start-region chunks
+    (cx/cy 0-2) are EXCLUDED: the starting clearing is dressed by
+    genLayout alone, so no chunk landmark can ever land on the spawn
+    court, the boss pentagram or the shrine compass. One-per-chunk +
+    the low rate means same-type neighbours are ~1-in-500 chunk pairs
+    — no clusters. The pick draws from the chunk's own seeded rng, so
+    a chunk's landmark is deterministic: the same ground always looks
+    the same when revisited. Position is inset 90px from the chunk
+    edges so two landmarks can never sit cheek-by-jowl across a
+    chunk boundary. */
+ if(!(cx>=0&&cx<=2&&cy>=0&&cy<=2)&&rng()<.08)ch.props.push({x:cx*CHUNK+90+rng()*(CHUNK-180),y:cy*CHUNK+90+rng()*(CHUNK-180),type:pickLandmarkType(rng()),v:Math.floor(rng()*4),ph:rng()*6.28});
  chunks.set(key,ch);
  if(chunks.size>140&&player){for(const[k,v]of chunks){const px=(k.split(',')[0]*CHUNK+CHUNK/2),py=(k.split(',')[1]*CHUNK+CHUNK/2);if(Math.hypot(px-player.x,py-player.y)>4200)chunks.delete(k)}}
  return ch}
 function ensureChunks(x,y){const ccx=Math.floor(x/CHUNK),ccy=Math.floor(y/CHUNK);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)genChunk(ccx+dx,ccy+dy)}
 function visibleChunks(x,y){const ccx=Math.floor(x/CHUNK),ccy=Math.floor(y/CHUNK),out=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)out.push(genChunk(ccx+dx,ccy+dy));return out}
-function hash2(x,y){let h=(x*374761393+y*668265263)^(zoneIdx*974711);h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296}
+function hash2(x,y){let h=(x*374761393+y*668265263);h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296} /* v151: the zoneIdx salt is deleted — floor picks, rubble and prop cells reshuffle once (cosmetic only) */
 function carveRect(x,y,w,h){for(let cy=y;cy<y+h;cy++)for(let cx=x;cx<x+w;cx++)gridSet(cx,cy,1)}
 function carveCorr(x0,y0,x1,y1,w){const brush=(bx,by)=>{for(let dy=0;dy<w;dy++)for(let dx=0;dx<w;dx++)gridSet(bx+dx,by+dy,1)};
  let x=x0,y=y0;while(x!==x1){brush(x,y);x+=x1>x0?1:-1}brush(x,y);
@@ -1783,34 +1765,41 @@ function floorSpawnPoint(minD,maxD){/* a point on the ring around the traveller 
  const a=rand(0,Math.PI*2),d=rand(minD,maxD);return{x:player.x+Math.cos(a)*d,y:player.y+Math.sin(a)*d}}
 function genLayout(){
  /* OPEN WASTE, HONESTLY (P2 fix): the old generator built a 9-13 room
-    dungeon grid — corridors, a secret room, a Demonic Fortress bridge — that
+    dungeon grid — corridors, a secret room, a fortress bridge — that
     NOTHING ever read: blockedCircle / losClear always returned open
     and cellAt always reported floor, so the layout was decorative
     fiction that could not affect movement, kiting, sight or pathing.
     It is gone. A floor is now exactly what it plays as: open endless
     waste with flat landmark points of interest placed around the
-    spawn clearing — a shrine and the boss arena marker — plus
-    hazard pools. No rooms, no corridors, no secret room, no walls
-    anywhere. v109: the layout is placed ONCE per run — there are no
+    spawn clearing — a shrine and the boss arena marker. No rooms, no
+    corridors, no secret room, no walls anywhere. v109: the layout is
+    placed ONCE per run — there are no
     floors to regenerate it for, no treasure chest (chests come only
     from bosses and mini-bosses now) and no elite arena point
     (elites are deleted; mini-bosses rise on the schedule bell). */
- mapGrid=new Uint8Array(MW*MH).fill(1);mapRooms=[];hazards=[];poi={shrines:[]};chests=[];chunks.clear();shrineClock=75; /* the run's one continuous arena: chunk dressing seeds from the chosen act, and the travelling shrine timer starts */
- const L=LAYOUTS[zoneIdx]||LAYOUTS[0];
+ mapGrid=new Uint8Array(MW*MH).fill(1);mapRooms=[];poi={shrines:[]};chests=[];chunks.clear();shrineClock=75; /* the run's one continuous arena: chunk dressing seeds from world coordinates, and the travelling shrine timer starts */
  spawnPt={x:world.w/2,y:world.h/2};
  poi.bossPt={x:spawnPt.x+620,y:spawnPt.y-300};
  poi.shrine={x:spawnPt.x+390,y:spawnPt.y+430,used:false};
  poi.secret=null; /* no secret room: there are no walls to hide one in */
- for(let i=0;i<L.pools;i++){const hx=spawnPt.x+rand(-700,700),hy=spawnPt.y+rand(-520,520);if(Math.hypot(hx-spawnPt.x,hy-spawnPt.y)<200)continue;const n=ri(3,5);for(let j=0;j<n;j++)hazards.push({x:hx+rand(-70,70),y:hy+rand(-70,70),r:rand(42,62),kind:L.hazard})}
- /* floor dressing: generated props (tombs / pillars / trees / shards)
-    scattered evenly across the open waste — never lined up, where a
-    row of props read as a wall or map edge the traveller could walk
-    straight through. Decor only: nothing on the floor blocks movement.
-    Kept clear of spawn / boss / shrine / chest spots */
- props=[];const z=ZONES[zoneIdx];
+ /* v151: the start-clearing hazard pools are DELETED (generation site
+    1 of 2 — the chunk clusters were site 2), and the tomb scatter
+    (9% of cells, up to 210 headstones) is DELETED with the tomb prop.
+    In their place, a FEW sparse landmarks (below): the clearing is
+    the player's first ground, so it gets its own small set, placed
+    per run (rand, not the chunk seed) and kept clear of the POIs by
+    clearOf. Decor only: nothing on the floor blocks movement. */
+ props=[];
  const clearOf=(x,y)=>{const pts=[spawnPt,poi.bossPt,poi.shrine,poi.secret];for(const pt of pts){if(pt&&Math.hypot(x-pt.x,y-pt.y)<90)return false}return true};
- for(let cy=0;cy<MH;cy++)for(let cx=0;cx<MW;cx++){if(!mapGrid[cy*MW+cx])continue;
-  if(hash2(cx*5+7,cy*5+3)<.09&&props.length<210){const px=cx*CELL+50+rand(-30,30),py=cy*CELL+50+rand(-22,22);if(clearOf(px,py))props.push({x:px,y:py,type:z.prop,v:ri(0,3),ph:rand(0,6.28)})}}
+ /* v151 LANDMARKS (start-clearing site): 8 attempts, each kept only if
+    it clears the POIs (clearOf, 90px) AND sits >=450px from every
+    landmark already placed — the separation rule is what keeps the
+    clearing sparse and cluster-free. Expect ~4-5 landmarks across
+    the 2600x1900 clearing (~1 per screen), types from the shared
+    weighted pick. Chunk landmarks never spawn inside the clearing
+    (genChunk excludes the 3x3 start-region chunks), so this is the
+    clearing's only dressing. */
+ for(let _li=0;_li<8;_li++){const _lx=120+rand(0,world.w-240),_ly=120+rand(0,world.h-240);if(!clearOf(_lx,_ly))continue;if(props.some(_p=>Math.hypot(_p.x-_lx,_p.y-_ly)<450))continue;props.push({x:_lx,y:_ly,type:pickLandmarkType(rand(0,1)),v:ri(0,3),ph:rand(0,6.28)})}
  mmStatic=null; /* minimap re-renders for the new arena */
 }
 /* v108: the Mastery panel is deleted — recalc folds this permanent ZERO
@@ -1925,7 +1914,7 @@ function recalc(p){
  p.effShots=Math.min(7,p.shots+p.passExtraProj);
  if(typeof allies!=='undefined'&&allies&&allies.length)for(const al of allies){if(al&&al.dMul&&p.allyDmgMul&&al.dMul!==p.allyDmgMul){al.damage=al.damage*p.allyDmgMul/al.dMul;al.dMul=p.allyDmgMul}if(al&&al.kind==='wolf'&&al.tbl!=null){const _hw2=findWeapon(p,'howlingcharm');if(_hw2){const _ct2=WEAPON_DMG.howlingcharm[_hw2.evo?8:Math.min(_hw2.lvl,8)-1];if(_ct2>0&&al.tbl>0&&_ct2!==al.tbl){al.damage=al.damage*_ct2/al.tbl;al.tbl=_ct2}}}} /* v149 THE HUNT (R1): live wolves RE-PRICE when the weapon's table entry moves — the bite finally levels (level-up / evolution rescale the snapshot by the table ratio, idempotent); hero-damage growth stays snapshotted, wolf HP never refreshes. The Druid guardian wolf carries no tbl and is untouched. */ /* v116 FIX 6 (Pack Sigil player-wide): LIVE allies re-fold the moment allyDmgMul moves — each ally carries the multiplier it was summoned with (dMul, set in the summon cases) and is rescaled by the ratio, so picking up or levelling Pack Sigil (or the Necromancer affinity slope stepping) buffs the wolves and skeletons already on the field instead of only the next summon */
  syncWeaponSkills(p)}
-function startGame(c){const _rv0=ui('rdVeil');if(_rv0)_rv0.classList.remove('show');const _rd0=ui('rdFx');if(_rd0)_rd0.classList.remove('show'); /* v141: a new run starts without the Red Death veil */ /* v92: every champion is free — no lock gate here (or anywhere). v92: GOLD RESETS — every run starts at 0 gold; nothing is carried in, and any boons a v91 save queued were already refunded and cleared on load, so nothing is consumed at Descend */runDiscoveries=[];earlyItemDone=false;onboardStep=0;player=newPlayer(c);pendingLevels=0;levelFxStart=0;enemies=[];shots=[];eruptQueue=[];gems=[];drops=[];magnets=[];coins=[];hearts=[];particles=[];floaters=[];allies=[];legionnaires=[];fx=[];teles=[];zonesFx=[];decals=[];embers=[];threads=[];graveFuses=[];graveChain=null;evoGlowIdx=-1;evoGlowUntil=0;elapsed=0;floorElapsed=0;spawnClock=0;attackClock=0;bossSpawned=false;bossIntermission=0;killCount=0;runBonusGold=0;gold=0;goldRunLive=true; /* v92: the run gold pool starts EMPTY — gold is earned inside this run only, and unspent gold is lost when the run ends (the Travelling Merchant may take it for a Gilded Egg on the death screen) */wave=1;resetWaves(1.2); /* v92: a fresh run means a fresh 0 gold — gold never carries between runs */bossRef=null;bossCount=0;floorNum=1;runShards=0;runDepth=1;deathBanked=false;deathEarned=0;nextMiniAt=150;nextBossAt=300;miniCount=0;redDeathWarned=false;redDeathRef=null;runEnder='';miniTeased=false;survived30=false;lastMinuteBanner=0;pendingEvoCeremony=null;pendingPairFanfare=null; /* v109: a fresh run resets the ARENA SCHEDULE — depth (floorNum) starts at 1 and advances one step per boss felled; the mini-boss / boss bells restart at 2:30 / 5:00 and the Red Death has not come */combo=0;comboT=0;bestCombo=0;chests=[];bossTeased=false;eshots=[];corpses=[];heroDeath=null;if(player.class==='Assassin'||player.class==='Nightwyrm')player.guard=1; /* v102 PHANTOM GUARD starts READY — the first boss contact of the run is blunted */player.rerolls=0;player.skips=0;player.banishes=0;player.buyReroll=0;player.buySkip=0;player.buyBanish=0; /* v128 VS: 0 rerolls / 0 skips / 0 banishes per run — bought with run gold on the level-up screen */camera.x=player.x;camera.y=player.y;camera.px=player.x;camera.py=player.y;genLayout();if(spawnPt){player.x=spawnPt.x;player.y=spawnPt.y;player.px=player.x;player.py=player.y;player.rx=player.x;player.ry=player.y;camera.x=player.x;camera.y=player.y;camera.px=player.x;camera.py=player.y}recordBuildDiscovery('w',(starterWeaponOf(c.name)||{}).id);recordBuildDiscovery('p',(starterWeaponOf(c.name)||{}).passive);state='play';closeModal();renderHotbar();syncHud(true);trackDepth();sfx('descend');showToast(c.name+' enters '+ZONES[zoneIdx].name+' — open waste: no walls, no edges, no map limit');
+function startGame(c){const _rv0=ui('rdVeil');if(_rv0)_rv0.classList.remove('show');const _rd0=ui('rdFx');if(_rd0)_rd0.classList.remove('show'); /* v141: a new run starts without the Red Death veil */ /* v92: every champion is free — no lock gate here (or anywhere). v92: GOLD RESETS — every run starts at 0 gold; nothing is carried in, and any boons a v91 save queued were already refunded and cleared on load, so nothing is consumed at Descend */runDiscoveries=[];earlyItemDone=false;onboardStep=0;player=newPlayer(c);pendingLevels=0;levelFxStart=0;enemies=[];shots=[];eruptQueue=[];gems=[];drops=[];magnets=[];coins=[];hearts=[];particles=[];floaters=[];allies=[];legionnaires=[];fx=[];teles=[];zonesFx=[];decals=[];embers=[];threads=[];graveFuses=[];graveChain=null;evoGlowIdx=-1;evoGlowUntil=0;elapsed=0;floorElapsed=0;spawnClock=0;attackClock=0;bossSpawned=false;bossIntermission=0;killCount=0;runBonusGold=0;gold=0;goldRunLive=true; /* v92: the run gold pool starts EMPTY — gold is earned inside this run only, and unspent gold is lost when the run ends (the Travelling Merchant may take it for a Gilded Egg on the death screen) */wave=1;resetWaves(1.2); /* v92: a fresh run means a fresh 0 gold — gold never carries between runs */bossRef=null;bossCount=0;floorNum=1;runShards=0;runDepth=1;deathBanked=false;deathEarned=0;nextMiniAt=150;nextBossAt=300;miniCount=0;redDeathWarned=false;redDeathRef=null;runEnder='';miniTeased=false;survived30=false;lastMinuteBanner=0;pendingEvoCeremony=null;pendingPairFanfare=null; /* v109: a fresh run resets the ARENA SCHEDULE — depth (floorNum) starts at 1 and advances one step per boss felled; the mini-boss / boss bells restart at 2:30 / 5:00 and the Red Death has not come */combo=0;comboT=0;bestCombo=0;chests=[];bossTeased=false;eshots=[];corpses=[];heroDeath=null;if(player.class==='Assassin'||player.class==='Nightwyrm')player.guard=1; /* v102 PHANTOM GUARD starts READY — the first boss contact of the run is blunted */player.rerolls=0;player.skips=0;player.banishes=0;player.buyReroll=0;player.buySkip=0;player.buyBanish=0; /* v128 VS: 0 rerolls / 0 skips / 0 banishes per run — bought with run gold on the level-up screen */camera.x=player.x;camera.y=player.y;camera.px=player.x;camera.py=player.y;genLayout();if(spawnPt){player.x=spawnPt.x;player.y=spawnPt.y;player.px=player.x;player.py=player.y;player.rx=player.x;player.ry=player.y;camera.x=player.x;camera.y=player.y;camera.px=player.x;camera.py=player.y}recordBuildDiscovery('w',(starterWeaponOf(c.name)||{}).id);recordBuildDiscovery('p',(starterWeaponOf(c.name)||{}).passive);state='play';closeModal();renderHotbar();syncHud(true);trackDepth();sfx('descend');showToast(c.name+' enters '+FLOOR.name+' — open waste: no walls, no edges, no map limit');
  /* FIRST-60s ONBOARDING BEAT (P1 fix): a new player is told the goal up front, then coached on pickups and keys — previously nothing stated a goal until the 118s boss tease, and mobile hid the only controls reference. */
  setTimeout(()=>{if(state==='play')showToast('GOAL: survive the horde — a mini-boss rises at 2:30 and a boss at 5:00, over and over. Their chests spin the slot reels and evolve your build. At 30:00 the Red Death comes: one touch ends the run')},2500);
  setTimeout(()=>{if(state==='play')showToast('XP gems fly to you inside your Pickup Radius — a red MAGNET pickup scoops EVERY gem on the map')},14000);
@@ -1936,43 +1925,49 @@ function iso(x,y){return{x:(x-y)*.72,y:(x+y)*.36}}
 function screenPos(x,y){const q=iso(x-camRX,y-camRY);return{x:W/2+q.x,y:H/2+q.y}}
 const TILE_CACHE={};
 /* ================= THE TILESET FLOORS =================
-   The ground IS the 12-tile isometric dungeon tileset in assets/tiles/
-   (sliced from the tileset sheet Zachery provided) — the whole floor,
-   everywhere, with nothing of any older painted floor left under it:
-     stone      plain cracked stone — the common base everywhere
-     bones      skeleton-strewn stone      pentagram  blood pentagram
-     moss       mossy stone                dirt       dirt & rubble
-     blood      blood-pool stone           ice        frozen stone
-     lava       lava-cracked stone         court      pillar courtyard
-     carpet     red-carpet stone           compass    compass-rose stone
-     grate      iron-grate stone
-   Each sheet tile is a photograph of a whole 3D slab — a lit top FACE
-   plus thick side walls on a black backing. Only the top face belongs
-   in a floor: TS_FACE below records each tile's face diamond (centre
-   x, top vertex, bottom vertex, width — measured from the actual
-   files), and buildFaceCanvas maps exactly that diamond onto the
-   ground diamond. The slab sides and black backing are never drawn,
-   so neighbouring faces meet edge to edge as one continuous stone
-   floor instead of a patchwork of separate blocks.
-   Each act's floor is a weighted MIX of these faces, chosen per floor
-   cell from a world-coordinate hash — varied broken stone, not one
-   repeated tile — running seamlessly through the starting clearing
-   and the endless waste beyond it:
-     Zone 1  Blood Moor        stone + dirt, rare bones / moss
-     Zone 2 Ancient Catacombs stone + bones + moss, rare blood
-     Zone 3 Cursed Forest    moss + dirt + stone, rare bones
-     Zone 4 Frozen Wasteland  ice + stone
-     Zone 5  Demonic Fortress  lava + stone, rare blood
-     Zone 6 The Abyss         stone + bones, rare pentagram / blood
+   The ground IS the Moor tileset in assets/tiles/ — eight painterly
+   Blood Moor flagstones in different states of wear, one weighted mix
+   across the whole endless floor, with nothing of any older painted
+   floor left under it:
+     moor_stone plain cracked flagstone — the common base (45%)
+     moor_worn  smooth foot-worn flagstone (20%)
+     moor_dirt  packed dark earth, pebbles, faint stone edges (12%)
+     moor_moss  flagstone, muted sage moss in the joints (8%)
+     moor_bones flagstone, a few sparse old weathered bones (5%)
+     moor_rubble flagstone, rubble chips, one tilted slab edge (5%)
+     moor_ash   flagstone dusted with pale warm-grey ash (3%)
+     moor_rune  flagstone, one faint worn carved ring (2%)
+   The old floor tiles (stone / bones / moss / dirt / blood / ice /
+   lava / carpet) are RETIRED from the load lists (v151) — their files
+   stay on disk, dormant, and their TS_FACE entries stay as harmless
+   data. The POI tiles below stay loadable: they are flat ground-art
+   landmarks at the points of interest, not floor dressing.
+   Each tile file holds one top FACE diamond on a black backing (the
+   old set photographed whole 3D slabs with thick side walls; the Moor
+   tiles are flat faces at the same 369x267 geometry). Only the top
+   face belongs in a floor: TS_FACE below records each tile's face
+   diamond (centre x, top vertex, bottom vertex, width), and
+   buildFaceCanvas maps exactly that diamond onto the ground diamond.
+   The black backing is never drawn, so neighbouring faces meet edge
+   to edge as one continuous stone floor instead of a patchwork of
+   separate blocks. All eight Moor tiles reuse the stone face diamond
+   verbatim ([.499,.007,.899,.986] — same vertices, art-design §4).
+   Each cell of the floor is a weighted MIX of these faces, chosen
+   per floor cell from a world-coordinate hash — varied broken stone,
+   not one repeated tile — running seamlessly through the starting
+   clearing and the endless waste beyond it (one floor, one mix —
+   v151 deleted the per-zone mixes with the zones):
+     Blood Moor  moor_stone + moor_worn, rarer dirt / moss / bones /
+                 rubble, rare ash, rarest rune
    The BIG special tiles are painted flat on the floor as landmarks at
    the points of interest (see drawPoiTiles): pentagram = boss arena,
-   compass = shrine, carpet = treasure room, blood = elite arena,
-   court = the spawn clearing, grate = the secret room once found.
+   compass = shrine, court = the spawn clearing, grate = the secret
+   room once found.
    All tiles are FLAT GROUND DRESSING ONLY — no collision, no barriers,
    no edges; floor items still rest exactly where they drop. */
 const TS_IMG={};
 function tsTex(name){if(TS_IMG[name])return TS_IMG[name];const im=new Image();im.src='assets/tiles/ts_'+name+'.png';TS_IMG[name]=im;return im}
-['stone','bones','pentagram','moss','dirt','blood','ice','lava','court','carpet','compass','grate'].forEach(tsTex); /* preload all twelve */
+['moor_stone','moor_worn','moor_dirt','moor_moss','moor_bones','moor_rubble','moor_ash','moor_rune','court','pentagram','compass','grate'].forEach(tsTex); /* v151: preload the eight Moor floor tiles + the four POI tiles — the old floor-only tiles (stone / bones / moss / dirt / blood / ice / lava / carpet) are retired from the load lists, files dormant on disk. This list MUST stay in sync with both _tilesReady lists (audit R9). */
 /* each tile's top-FACE diamond as fractions of its image:
    [centreX, topVertexY, bottomVertexY, faceWidth] — measured from the
    sliced files (silhouette widest row = the face's left/right
@@ -1985,15 +1980,16 @@ const TS_FACE={
  dirt:[.499,.006,.777,.986], blood:[.499,.006,.777,.986],
  ice:[.500,.006,.771,.986], lava:[.500,.006,.765,.986],
  court:[.499,0,.906,.986], carpet:[.499,0,.896,.986],
- compass:[.497,0,.903,.989], grate:[.500,0,.906,.986]};
-/* weighted floor mix per act: [tile, weight] pairs */
+ compass:[.497,0,.903,.989], grate:[.500,0,.906,.986],
+ /* v151: the eight Moor tiles reuse the stone face diamond verbatim —
+    same 369x267 geometry, same vertices (art-design.md §4) */
+ moor_stone:[.499,.007,.899,.986], moor_worn:[.499,.007,.899,.986],
+ moor_dirt:[.499,.007,.899,.986], moor_moss:[.499,.007,.899,.986],
+ moor_bones:[.499,.007,.899,.986], moor_rubble:[.499,.007,.899,.986],
+ moor_ash:[.499,.007,.899,.986], moor_rune:[.499,.007,.899,.986]};
+/* weighted floor mix: [tile, weight] pairs — one floor, one mix (v151: the five per-zone mixes are deleted with their zones) */
 const TS_FLOOR=[
- [['stone',.68],['dirt',.20],['bones',.06],['moss',.06]],
- [['stone',.60],['bones',.22],['moss',.10],['blood',.08]],
- [['moss',.42],['dirt',.26],['stone',.24],['bones',.08]],
- [['ice',.66],['stone',.34]],
- [['lava',.52],['stone',.38],['blood',.10]],
- [['stone',.62],['bones',.18],['pentagram',.08],['blood',.12]]];
+ [['moor_stone',.45],['moor_worn',.20],['moor_dirt',.12],['moor_moss',.08],['moor_bones',.05],['moor_rubble',.05],['moor_ash',.03],['moor_rune',.02]]]; /* v151: the Moor mix — one floor, one mix (weights per art-design.md §2, sum 1.00) */
 function tsPick(set,h){let acc=0;for(const [n,w] of set){acc+=w;if(h<acc)return n}return set[0][0]}
 function diamondPath(g,Wd,Hd){g.beginPath();g.moveTo(Wd/2,0);g.lineTo(Wd,Hd/2);g.lineTo(Wd/2,Hd);g.lineTo(0,Hd/2);g.closePath()}
 /* pre-render ONE ground diamond (Wd x Hd, exactly 2:1) holding only
@@ -2025,17 +2021,16 @@ function buildFaceCanvas(name,Wd,Hd,flip,wash,washA,inset){const tex=tsTex(name)
  g.restore();
  if(wash){diamondPath(g,Wd,Hd);g.save();g.clip();g.globalAlpha=washA;g.fillStyle=wash;g.fillRect(0,0,Wd,Hd);g.restore()}
  return c}
-/* one floor tile, cached per act+tile+flip — zero per-frame cost
+/* one floor tile, cached per tile+flip — zero per-frame cost
    beyond the drawImage the floor always did. No outline is stroked
    around the diamond: an outlined tile is a piecemeal tile. */
-function tsCanvas(name,z,flip){const key=zoneIdx+'|'+name+'|'+(flip?1:0);if(TILE_CACHE[key])return TILE_CACHE[key];
- /* NO act-palette wash on floor tiles any more: the old 10% wash of
+function tsCanvas(name,z,flip){const key=name+'|'+(flip?1:0);if(TILE_CACHE[key])return TILE_CACHE[key]; /* v151: the zoneIdx cache-key segment is deleted — one floor, one key space */
+ /* NO palette wash on floor tiles any more: the old 10% wash of
     the act's dark flat floor colour dragged every tile back toward
     the pre-tileset painted floor. The tiles show their own colours
-    now; the acts still read apart through their tile mixes. The
-    face is sampled at 93% (rim cropped) so cells blend edge to edge. */
- const _wash=zoneIdx===3?['#6b7c8c',.34]:zoneIdx===4?['#6e5a52',.30]:null; /* ZONE RE-GRADE: Frozen Wasteland ice is 66% near-white and Demonic Fortress lava 52% saturated — both fought the dark UI. Those two acts (and only those two) bake a desaturating grey wash into their cached floor faces. */
- const c=buildFaceCanvas(name,152,76,flip,_wash?_wash[0]:null,_wash?_wash[1]:0,.93);
+    now. The face is sampled at 93% (rim cropped) so cells blend edge
+    to edge. */
+ const c=buildFaceCanvas(name,152,76,flip,null,0,.93); /* v151: the Frozen/Demonic re-grade wash is deleted with zones 3/4 — floor tiles bake no wash */
  if(!c)return paintedTileFallback(z,flip);
  TILE_CACHE[key]=c;return c}
 /* a big landmark tile painted flat on the floor at a world point:
@@ -2070,8 +2065,8 @@ function paintedTileFallback(z,alt){const [c,g]=mkCanvas(152,76),p=painter(g);
  for(let i=0;i<6;i++){seed=(seed*149+17)%991;p.r((seed*11)%140,(seed*5)%68,9,2,'#211f1d')}g.restore();return c}
 const PROP_CACHE={};
 function propCanvas(type,v){const key=type+v;if(PROP_CACHE[key])return PROP_CACHE[key];const [c,g]=mkCanvas(56,84),p=painter(g);
- if(type==='tomb'){p.r(18,26,20,34,'#565b63');p.r(18,26,20,4,'#767c86');p.r(20,20,16,8,'#565b63');p.r(26,32,4,12,'#c9a22788');p.r(22,38,12,2,'#c9a22788');p.r(10,58,36,6,'#3c4149');if(v===1){p.r(14,44,8,3,'#2b2f36');p.r(36,34,6,10,'#2b2f36')}}
- else if(type==='pillar'){p.r(16,60,24,6,'#4a4d55');p.r(19,18,18,42,'#5d6068');p.r(19,18,4,42,'#767a84');p.r(19,30,18,3,'#43464e');p.r(19,44,18,3,'#43464e');p.r(15,12,26,7,'#6e7178');if(v===1){p.r(30,24,4,16,'#33353c');p.r(38,58,10,6,'#4a4d55')}}
+ /* v151: the tomb branch is deleted with the tomb prop */
+ if(type==='pillar'){p.r(16,60,24,6,'#4a4d55');p.r(19,18,18,42,'#5d6068');p.r(19,18,4,42,'#767a84');p.r(19,30,18,3,'#43464e');p.r(19,44,18,3,'#43464e');p.r(15,12,26,7,'#6e7178');if(v===1){p.r(30,24,4,16,'#33353c');p.r(38,58,10,6,'#4a4d55')}}
  else if(type==='tree'){p.r(25,34,6,30,'#2c241c');p.r(27,20,3,16,'#3a2f22');g.strokeStyle='#241c14';g.lineWidth=4;g.beginPath();g.moveTo(27,26);g.lineTo(10,10);g.moveTo(28,22);g.lineTo(44,6);g.moveTo(28,30);g.lineTo(48,20);g.stroke();g.lineWidth=2;g.beginPath();g.moveTo(12,12);g.lineTo(6,4);g.moveTo(43,8);g.lineTo(47,1);g.stroke();p.r(14,62,28,4,'#1c1712')}
  else if(type==='shard'){p.r(22,26,12,38,'#5d87a8');p.r(24,26,4,38,'#9fc6e8');p.r(12,44,8,20,'#486a86');p.r(38,40,8,24,'#486a86');p.r(8,62,40,4,'#31485c')}
  else if(type==='lava'){p.r(10,52,36,12,'#2b2320');p.r(14,56,28,3,'#ff6a2a');p.r(18,48,6,8,'#3d322c');p.r(32,44,7,12,'#3d322c');p.r(33,45,3,4,'#ffb32a')}
@@ -2102,7 +2097,7 @@ function drawFlatRubble(z){
  }}
 let FLOOR_LAYER=null,FLOOR_LCTX=null,FLOOR_KEY='',FLOOR_CAMX=0,FLOOR_CAMY=0;const FLOOR_MARGIN=190;
 function renderFloorLayer(){ /* the whole tileset sweep, painted ONCE into a viewport-sized offscreen canvas (plus margin) anchored at the quantized camera cell FLOOR_CAMX/Y */
- const step=72,z=ZONES[zoneIdx],floorSet=TS_FLOOR[zoneIdx]||TS_FLOOR[0];
+ const step=72,z=FLOOR,floorSet=TS_FLOOR[0]; /* v151: one floor — the single mix, the single floor definition */
  if(!FLOOR_LAYER){FLOOR_LAYER=document.createElement('canvas');FLOOR_LCTX=FLOOR_LAYER.getContext('2d');FLOOR_LCTX.imageSmoothingEnabled=false}
  const LW=W+FLOOR_MARGIN*2,LH=H+FLOOR_MARGIN*2;
  if(FLOOR_LAYER.width!==LW||FLOOR_LAYER.height!==LH){FLOOR_LAYER.width=LW;FLOOR_LAYER.height=LH}
@@ -2112,7 +2107,7 @@ function renderFloorLayer(){ /* the whole tileset sweep, painted ONCE into a vie
  const uR=Math.ceil((W/2+dw+FLOOR_MARGIN)/(step*.72))+1,vR=Math.ceil((H/2+dh+FLOOR_MARGIN)/(step*.36))+1;
  const u0=Math.floor(uc-uR),u1=Math.ceil(uc+uR),v0=Math.floor(vc-vR),v1=Math.ceil(vc+vR);
  for(let v=v0;v<=v1;v++)for(let u=u0;u<=u1;u++){if((u+v)&1)continue;const J=(u+v)/2,K=(v-u)/2,wx=J*step,wy=K*step;const rx=wx-FLOOR_CAMX,ry=wy-FLOOR_CAMY;const sx=W/2+(rx-ry)*.72+FLOOR_MARGIN,sy=H/2+(rx+ry)*.36+FLOOR_MARGIN;const h1=hash2(J*3+1,K*3+2);g.drawImage(tsCanvas(tsPick(floorSet,h1),z,h1>.5),sx-dw/2,sy-dh/2,dw,dh)}}
-function drawWorld(){const z=ZONES[zoneIdx];ctx.fillStyle=z.bg;ctx.fillRect(0,0,W,H);
+function drawWorld(){const z=FLOOR;ctx.fillStyle=z.bg;ctx.fillRect(0,0,W,H);
  const step=72;
  /* The tile lattice is a pure world grid: no row offsets, no
     camera-relative indexing. A cell's screen position AND its tile
@@ -2141,26 +2136,19 @@ function drawWorld(){const z=ZONES[zoneIdx];ctx.fillStyle=z.bg;ctx.fillRect(0,0,
     more — ~1,147 drawImage attempts/frame at 1080p (~3,776 at 4K)
     became ONE drawImage of the pre-rendered layer. The layer is
     re-painted only when the camera crosses a floor-cell boundary
-    (or the act / viewport changes, or tile art finishes loading);
+    (or the viewport changes, or tile art finishes loading);
     between crossings it simply blits, shifted by the sub-cell
     camera offset through the same iso projection. */
  const _qx=Math.floor(camRX/step)*step,_qy=Math.floor(camRY/step)*step;
- const _tilesReady=['stone','bones','pentagram','moss','dirt','blood','ice','lava','court','carpet','compass','grate'].every(nm=>{const im=tsTex(nm);return im.complete&&im.naturalWidth});
- const _fkey=_qx+','+_qy+','+zoneIdx+','+W+'x'+H;
+ const _tilesReady=['moor_stone','moor_worn','moor_dirt','moor_moss','moor_bones','moor_rubble','moor_ash','moor_rune','court','pentagram','compass','grate'].every(nm=>{const im=tsTex(nm);return im.complete&&im.naturalWidth}); /* v151: MUST stay in sync with the preload list + the Pixi list (audit R9) */
+ const _fkey=_qx+','+_qy+','+W+'x'+H; /* v151: the zoneIdx key segment is deleted — camera cell + viewport only */
  if(_fkey!==FLOOR_KEY){FLOOR_CAMX=_qx;FLOOR_CAMY=_qy;renderFloorLayer();FLOOR_KEY=_tilesReady?_fkey:'__loading'}
  if(FLOOR_LAYER){const _sdx=camRX-FLOOR_CAMX,_sdy=camRY-FLOOR_CAMY;ctx.drawImage(FLOOR_LAYER,-FLOOR_MARGIN-(_sdx-_sdy)*.72,-FLOOR_MARGIN-(_sdx+_sdy)*.36,W+FLOOR_MARGIN*2,H+FLOOR_MARGIN*2)}
  /* landmark tileset tiles marking the points of interest — pentagram
-    boss arena, compass shrines, carpet treasure room, blood elite
-    arena, courtyard spawn, grate secret room (once found) */
+    boss arena, compass shrines, courtyard spawn, grate secret room
+    (once found) */
  drawPoiTiles();
- /* hazard pools painted on the floor (lava / ice / poison / void) —
-    the starting clearing's pools plus the endless chunks' pools */
- const _hzDraw=hazards.slice();visibleChunks(camRX,camRY).forEach(ch=>{for(const hz of ch.hazards)_hzDraw.push(hz)});
- for(const hz of _hzDraw){const s=screenPos(hz.x,hz.y);if(s.x<-100||s.x>W+100||s.y<-80||s.y>H+80)continue;
-  ctx.fillStyle=hz.kind==='lava'?'rgba(255,106,42,.5)':hz.kind==='ice'?'rgba(159,198,232,.38)':hz.kind==='void'?'rgba(154,106,217,.4)':'rgba(110,200,90,.32)';
-  ctx.beginPath();ctx.ellipse(s.x,s.y,hz.r*.72,hz.r*.36,0,0,7);ctx.fill();
-  if(hz.kind==='ice'){ctx.strokeStyle='rgba(220,240,255,.35)';ctx.lineWidth=1;ctx.stroke()}
-  if(hz.kind==='lava'){ctx.globalAlpha=.45+.2*Math.sin(performance.now()/300+hz.x);ctx.drawImage(glowImg('#ff6a2a'),s.x-46,s.y-46,92,92);ctx.globalAlpha=1}}
+ /* v151: the hazard ground pass is DELETED with the hazard system */
  /* flat ground dressing only — rubble, cracks and worn patches lying
     on the floor, scattered by world hash. No edge, border or frontier
     is drawn anywhere: the ground is one continuous surface, in the
@@ -2170,23 +2158,20 @@ function drawWorld(){const z=ZONES[zoneIdx];ctx.fillStyle=z.bg;ctx.fillRect(0,0,
    The world is unbounded, so the minimap has no fixed frame and no
    edge to draw: it shows the ground around the hero (about 1,900
    world units across), re-centred on him every stamp — local floor
-   checker sampled from world coordinates, nearby hazard pools,
-   chests, shrines, the horde and the boss, with the hero pinned to
-   the centre. Features beyond the local view simply aren't on it,
-   the way a traveller's sketch of his surroundings would be. */
+   checker sampled from world coordinates, chests, shrines, the horde
+   and the boss, with the hero pinned to the centre. Features beyond
+   the local view simply aren't on it, the way a traveller's sketch
+   of his surroundings would be. */
 function drawMinimap(){const mc=ui('minimap');if(!mc)return;if(!mmCtx)mmCtx=mc.getContext('2d');const g=mmCtx;
  g.fillStyle='#05070a';g.fillRect(0,0,156,114);
  if(!player){g.fillStyle='#66502e';g.font='10px Georgia';g.fillText('— the endless waste —',28,60);return}
- const z=ZONES[zoneIdx],SC=156/1900,CX=78,CY=57;
+ const z=FLOOR,SC=156/1900,CX=78,CY=57;
  const px2=x=>CX+(x-player.x)*SC,py2=y=>CY+(y-player.y)*SC;
  /* local floor checker from world cells — continuous at any distance */
  const cs=100*SC;
  const gx0=Math.floor((player.x-950)/100),gx1=Math.floor((player.x+950)/100),gy0=Math.floor((player.y-700)/100),gy1=Math.floor((player.y+700)/100);
  for(let cy2=gy0;cy2<=gy1;cy2++)for(let cx2=gx0;cx2<=gx1;cx2++){g.fillStyle=(((cx2+cy2)%2)+2)%2?z.tileA:z.tileB;g.fillRect(Math.round(px2(cx2*100)),Math.round(py2(cy2*100)),Math.ceil(cs),Math.ceil(cs))}
- const hzCol=hz=>hz.kind==='lava'?'#ff6a2a':hz.kind==='ice'?'#9fc6e8':hz.kind==='void'?'#9a6ad9':'#6ec85a';
- const dot=(x,y,c,r)=>{const dx2=px2(x),dy2=py2(y);if(dx2<-4||dx2>160||dy2<-4||dy2>118)return;g.fillStyle=c;g.fillRect(Math.round(dx2)-r,Math.round(dy2)-r,r*2,r*2)};
- hazards.forEach(hz=>dot(hz.x,hz.y,hzCol(hz),2));
- visibleChunks(player.x,player.y).forEach(ch=>ch.hazards.forEach(hz=>dot(hz.x,hz.y,hzCol(hz),2)));
+ const dot=(x,y,c,r)=>{const dx2=px2(x),dy2=py2(y);if(dx2<-4||dx2>160||dy2<-4||dy2>118)return;g.fillStyle=c;g.fillRect(Math.round(dx2)-r,Math.round(dy2)-r,r*2,r*2)}; /* v151: the hazard dots are deleted with the hazard system */
  if(poi.bossPt&&!bossSpawned&&(mode==='adventure'||mode==='endless'||mode==='bossrush'))dot(poi.bossPt.x,poi.bossPt.y,'#8a1420',3);
  chests.forEach(ch=>{if(!ch.open)dot(ch.x,ch.y,'#ffd94a',2)});
  if(poi.shrine&&!poi.shrine.used)dot(poi.shrine.x,poi.shrine.y,'#7fe7ff',2);
@@ -2912,8 +2897,8 @@ function spawnMiniBoss(){if(enemies.some(e=>e.mini&&!e.dead))return;const e=spaw
  showToast('◆ MINI-BOSS — '+e.miniName+' rises! Fell it for a boss chest');sfx('miniboss')}
 /* ---------------- v109 THE RED DEATH ----------------
    At exactly 30:00 it arrives. It is NOT a boss: damageEnemy refuses
-   it outright (no damage, no damage numbers, no leech), DoTs and
-   hazards skip it, and its touch bypasses hurtPlayer entirely — no
+   it outright (no damage, no damage numbers, no leech), DoTs
+   skip it, and its touch bypasses hurtPlayer entirely — no
    invulnerability window, no shield charge, no Phantom Guard can
    save you. One touch ends the run (see the enemy update). */
 let rdBannerTimer=0;
@@ -3752,7 +3737,7 @@ function buildBugReport(desc){
  lines.push('Game state: '+((state==='bugreport'&&typeof bugReturn!=='undefined')?bugReturn:state)+(aiOn?' · Watch AI Play: ON':''));
  lines.push('Class: '+(p?p.class:(typeof CLASSES!=='undefined'&&CLASSES[menuClassIdx]?CLASSES[menuClassIdx].name+' (selected on menu, no active run)':'None — no active run')));
  lines.push('Level: '+(p?p.level:'—'));
- lines.push('Act: '+((ZONES[zoneIdx]&&ZONES[zoneIdx].name)||('Zone '+zoneIdx)));
+ lines.push('Floor: '+FLOOR.name); /* v151: the 'Act:' line is reworded — one floor, no acts */
  lines.push('Depth: '+floorNum+' (run depth by bosses felled; Descent Depth '+currentDepth()+' by minutes survived)');
  lines.push('Wave: '+wave);
  lines.push('Timer: '+fmt(elapsed)+' ('+Math.floor(elapsed)+'s elapsed)');
@@ -4123,7 +4108,6 @@ function menu(){state='menu';const _rv=ui('rdVeil');if(_rv)_rv.classList.remove(
  <div class="secHead">Step 2 — Set up your run</div>
  <div class="row" style="margin-bottom:8px"><label>Mode</label><select id="mMode">${Object.entries(MODES).map(([k,v])=>`<option value="${k}" ${mode===k?'selected':''}>${v.label}</option>`).join('')}</select>
  <label>Difficulty</label><select id="mDiff">${Object.entries(DIFFS).map(([k,v])=>`<option value="${k}" ${difficulty===k?'selected':''}>${v.label}</option>`).join('')}</select>
- <label>Destination</label><select id="mZone">${ZONES.map((z,i)=>`<option value="${i}" ${zoneIdx===i?'selected':''}>${z.name}</option>`).join('')}</select>
  <label>Challenge</label><select id="mChal">${Object.entries(CHALLENGES).map(([k,v])=>`<option value="${k}" ${challenge===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
  <p class="small" style="color:#ffb0a2;margin:0 0 4px"><b>Gloom is locked</b> until you fell the Dread Knight once on Dusk. The <b>Endless Dungeon</b> mode and <b>Nightfall</b> difficulty are <b>free and open to everyone</b> — no unlock, no price.</p>
  <p class="small" id="mNightfallWarn" style="color:#ff8a70;margin:0 0 4px;${difficulty==='hell'?'':'display:none'}"><b>◆ NIGHTFALL WARNING:</b> Nightfall's first boss is a <b>fresh-kit wall</b> — even with Nightfall's multipliers now ramping in over the first floors, a brand-new hero with a level-1 starting weapon faces the hardest opener in the game. <b>Clear Dusk or Gloom first</b> and learn the fights before you descend into Nightfall.</p>
@@ -4141,7 +4125,7 @@ function menu(){state='menu';const _rv=ui('rdVeil');if(_rv)_rv.classList.remove(
  <div class="secHead">More</div>
  <div class="row"><button id="mGal" type="button">Sprite Gallery</button><button id="mSave" type="button">Save Export / Import</button><button id="mSettings" type="button">Settings</button><button id="mBug" class="bugBtn" type="button" data-bug-report>Report a Bug</button><button id="mNewGame" class="newGameBtn" type="button">New Game — Wipe All Progress</button></div>
  <p class="small">Controls: WASD / arrows move · Space dash · Q potion · I build · C codex · Esc pause.</p>`);
- ui('mMode').onchange=e=>{mode=e.target.value}; /* v93: Endless Dungeon is FREE for everyone — no lock gate here any more */ ui('mDiff').onchange=e=>{if(e.target.value==='nightmare'&&!((meta.unlocks&&meta.unlocks.deep>=1)||meta.normalBossKills>0)){e.target.value=difficulty;menuShowProg=true;menu();showToast('Gloom is locked — fell the Dread Knight on Dusk once to open it');return}difficulty=e.target.value;const _hw=ui('mNightfallWarn');if(_hw)_hw.style.display=difficulty==='hell'?'block':'none';if(difficulty==='nightmare'){showToast('Gloom: foe health ramps ×1.28 → ×1.45 and damage ×1.13 → ×1.33 over the first three depths');toastTimer=6}if(difficulty==='hell'){showToast('NIGHTFALL: its first boss is a fresh-kit wall — clear Dusk or Gloom first. Health and damage both ramp in over the early depths');toastTimer=7}}; /* v93: Nightfall difficulty is FREE for everyone — its lock gate is gone. Gloom keeps its EXACT old rule (owned Descent unlock rank 1+, read from meta.unlocks directly because PE.deep is now floored at 2 for the free Endless / Nightfall, OR one Dusk Dread Knight kill) */ui('mZone').onchange=e=>zoneIdx=+e.target.value;
+ ui('mMode').onchange=e=>{mode=e.target.value}; /* v93: Endless Dungeon is FREE for everyone — no lock gate here any more */ ui('mDiff').onchange=e=>{if(e.target.value==='nightmare'&&!((meta.unlocks&&meta.unlocks.deep>=1)||meta.normalBossKills>0)){e.target.value=difficulty;menuShowProg=true;menu();showToast('Gloom is locked — fell the Dread Knight on Dusk once to open it');return}difficulty=e.target.value;const _hw=ui('mNightfallWarn');if(_hw)_hw.style.display=difficulty==='hell'?'block':'none';if(difficulty==='nightmare'){showToast('Gloom: foe health ramps ×1.28 → ×1.45 and damage ×1.13 → ×1.33 over the first three depths');toastTimer=6}if(difficulty==='hell'){showToast('NIGHTFALL: its first boss is a fresh-kit wall — clear Dusk or Gloom first. Health and damage both ramp in over the early depths');toastTimer=7}}; /* v93: Nightfall difficulty is FREE for everyone — its lock gate is gone. Gloom keeps its EXACT old rule (owned Descent unlock rank 1+, read from meta.unlocks directly because PE.deep is now floored at 2 for the free Endless / Nightfall, OR one Dusk Dread Knight kill) */ /* v151: the Destination dropdown + its zoneIdx writer are deleted — one floor */
  const mc=ui('mChal');if(mc)mc.onchange=e=>{challenge=e.target.value;meta.challenge=challenge;saveAll()};
  const mcx=ui('mCodex');if(mcx)mcx.onclick=()=>codexUI('menu');
  const msv=ui('mSave');if(msv)msv.onclick=()=>exportSaveUI('menu');
@@ -4171,7 +4155,7 @@ function gallery(){state='gallery';
  <figure><img class="sheet" src="assets/sprite-sheet-props.webp" alt="Generated environment props sheet"><figcaption>NEW props sheet — tombstones, pillars, dead tree, torch brazier, arch</figcaption></figure></div>
  <h2 class="sub">Heroes — walk A / walk B (leg strides derived from each hero's idle art — same character, legs only)</h2><div class="gal">${CLASSES.map(c=>`<figure><img src="${spriteURL('hero_'+c.name,1)}" alt="${c.name} walk A"><figcaption>${c.name} walk A</figcaption></figure><figure><img src="${spriteURL('hero_'+c.name,2)}" alt="${c.name} walk B"><figcaption>${c.name} walk B</figcaption></figure>`).join('')}</div>
  <h2 class="sub">Cast poses</h2><div class="gal">${CLASSES.map(c=>`<figure><img src="${spriteURL('hero_'+c.name,4)}" alt="${c.name} cast"><figcaption>${c.name} cast</figcaption></figure>`).join('')}</div>
- <h2 class="sub">Environment props — generated, in-game</h2><div class="gal">${[['prop_tomb0','Cross tombstone'],['prop_tomb1','Tilted tombstone'],['prop_pillar0','Broken pillar'],['prop_pillar1','Torch brazier pillar'],['prop_pillar2','Ruined arch'],['prop_tree0','Dead tree']].map(([f,d])=>`<figure><img src="assets/sprites/${f}.png" alt="${d}"><figcaption>${d}</figcaption></figure>`).join('')}</div>
+ <h2 class="sub">Environment props — generated, in-game</h2><div class="gal">${[['prop_pillar0','Broken pillar'],['prop_pillar1','Torch brazier pillar'],['prop_pillar2','Ruined arch'],['prop_moor_tree','Dead tree'],['prop_moor_chapel','Ruined chapel'],['prop_moor_stones','Standing stones'],['prop_moor_obelisk','Broken waystone']].map(([f,d])=>`<figure><img src="assets/sprites/${f}.png" alt="${d}"><figcaption>${d}</figcaption></figure>`).join('')}</div>
  <h2 class="sub">Heroes — in-game sprites</h2><div class="gal">${CLASSES.map(c=>`<figure><img src="${spriteURL('hero_'+c.name,0)}" alt="${c.name}"><figcaption>${c.name}</figcaption></figure>`).join('')}</div>
  <h2 class="sub">Enemies — in-game sprites</h2><div class="gal">${foes.map(([k,d])=>`<figure><img src="${spriteURL('foe_'+k,0)}" alt="${k}"><figcaption>${k}<br><span class="small">${d}</span></figcaption></figure>`).join('')}</div>
  <h2 class="sub">Enemies — animation frames</h2><p class="small">Walk A / Walk B stride frames and the attack pose, re-posed from each family's sprite above — the exact frames the game cycles while enemies walk, wind up and strike. Taking a hit flashes the white hurt frame with a recoil; deaths crumble (skeletons &amp; knights), dissolve (wraiths &amp; cultists) or collapse (everything else).</p><div class="gal">${foes.map(([k])=>`<figure><img src="${frameURL('foe_'+k,1)}" alt="${k} walk A"><figcaption>${k} walk A</figcaption></figure><figure><img src="${frameURL('foe_'+k,2)}" alt="${k} walk B"><figcaption>${k} walk B</figcaption></figure><figure><img src="${frameURL('foe_'+k,3)}" alt="${k} attack"><figcaption>${k} attack</figcaption></figure>`).join('')}</div>
@@ -4181,7 +4165,7 @@ function gallery(){state='gallery';
  <button id="gBack">Back</button>`);
  ui('gBack').onclick=menu}
 
-function pauseGame(){state='pause';showModal(`<h1>PAUSED</h1><p>The ${ZONES[zoneIdx].name} waits.</p><p class="small">${player.class} · Level ${player.level} · ${killCount} kills · ${fmt(elapsed)} · Gold ${gold}</p><button id="resume">Resume (Esc)</button><button id="pBuild">Build (I)</button><button id="pCodex">Codex (C)</button><button id="pAI">▶ Watch AI Play</button><button id="pSpeed">Game Speed: 1× (F)</button><button id="pSettings">Settings</button><button id="pBug" class="bugBtn" type="button" data-bug-report>Report a Bug</button><button id="quit">Abandon run — return to menu</button>`);
+function pauseGame(){state='pause';showModal(`<h1>PAUSED</h1><p>The ${FLOOR.name} waits.</p><p class="small">${player.class} · Level ${player.level} · ${killCount} kills · ${fmt(elapsed)} · Gold ${gold}</p><button id="resume">Resume (Esc)</button><button id="pBuild">Build (I)</button><button id="pCodex">Codex (C)</button><button id="pAI">▶ Watch AI Play</button><button id="pSpeed">Game Speed: 1× (F)</button><button id="pSettings">Settings</button><button id="pBug" class="bugBtn" type="button" data-bug-report>Report a Bug</button><button id="quit">Abandon run — return to menu</button>`);
  ui('resume').onclick=()=>{state='play';closeModal()};ui('pBuild').onclick=()=>buildUI('play');ui('quit').onclick=()=>{endRunTo(()=>menu())}; /* v78: abandoning ends the run */
  const pc=ui('pCodex');if(pc)pc.onclick=()=>codexUI('pause');const pa=ui('pAI');if(pa)pa.onclick=()=>{setAi(true);state='play';closeModal();showToast('AI PILOT engaged — sit back and watch')};const psp=ui('pSpeed');if(psp){psp.textContent='Game Speed: '+gameSpeed+'× (F)';psp.onclick=()=>{cycleGameSpeed()}}const pst=ui('pSettings');if(pst)pst.onclick=()=>settingsUI('pause')}
 /* ---------------- v109 THE TRAVELLING MERCHANT — OUTSIDE RUNS ONLY ----------------
@@ -4248,8 +4232,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
  if(joyVec.active&&(Math.abs(joyVec.x)>.12||Math.abs(joyVec.y)>.12)){dx=joyVec.x+joyVec.y;dy=joyVec.y-joyVec.x} /* joystick drag is a screen direction too — same rotation */
  else if(aiOn){dx=aiVec.x;dy=aiVec.y}
  const len=Math.hypot(dx,dy)||1;const mag=Math.min(1,Math.hypot(dx,dy));if((dx||dy)&&(Math.abs(dx)>.01||Math.abs(dy)>.01))p.moveAng=Math.atan2(dy,dx); /* v130: the hero's FACING (last movement angle, world axes) - the Gravebow fires along it; defaults to 0 (right) until the hero first moves */
- const _phz=hazardAt(p.x,p.y); /* standing in lava / void / poison / on ice — checked once per step */
- const spd=p.speed*(p.class==='Amazon'&&!enemies.some(e=>!e.dead&&Math.hypot(e.x-p.x,e.y-p.y)<150)?1.10:1) /* Amazon trait: +10% speed while no foe is near (deepened by her Mastery trait perk). v139 SPRINT REMOVED: the old (Shift || full-tilt joystick) x1.3 factor is gone — full tilt now just moves at base speed, like VS (no sprint), closing the last v138 parity escape valve. */*(p.rageT>0?1.25:1)*Math.max(mag,.35)*(_phz&&_phz.kind==='ice'?.6:1);
+ const spd=p.speed*(p.class==='Amazon'&&!enemies.some(e=>!e.dead&&Math.hypot(e.x-p.x,e.y-p.y)<150)?1.10:1) /* Amazon trait: +10% speed while no foe is near (deepened by her Mastery trait perk). v139 SPRINT REMOVED: the old (Shift || full-tilt joystick) x1.3 factor is gone — full tilt now just moves at base speed, like VS (no sprint), closing the last v138 parity escape valve. */*(p.rageT>0?1.25:1)*Math.max(mag,.35); /* v151: the hazard query + ice slow + hazard damage tick are deleted with the hazard system */
  /* v138 FULL PARITY: INSTANT velocity, exactly as VS — no accel ramp, no
     coast on release. The old exponential approach (rate 14/s, ~71ms time
     constant, ~0.2s to 95% speed) made reversals coast into the horde in a
@@ -4259,7 +4242,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
  const _ox=p.x,_oy=p.y;
  p.x+=p.vx*dt;p.y+=p.vy*dt; /* ENDLESS: no bounds clamp — the hero walks forever in any direction */
  resolveEntity(p,_ox,_oy,13); /* no collision with the world (blockedCircle is always false) — nothing stops the hero, ever */
- if(_phz&&_phz.kind!=='ice'){p.hp-=(_phz.kind==='lava'?16:_phz.kind==='void'?10:6)*dt;if(Math.random()<dt*7)pixelBurst(p.x,p.y-8,2,_phz.kind==='lava'?'#ff6a2a':_phz.kind==='void'?'#9a6ad9':'#6ec85a');if(p.hp<=0){p.hp=0;gameOver();return}}
+ /* v151: the hazard damage tick (lava 16/s, void 10/s, poison 6/s — it could kill) is deleted with the hazard system */
  if(p.blessT>0)p.blessT-=dt;
  p.moving=Math.hypot(p.vx,p.vy)>14;
  if(p.moving){p.animT+=dt*(6+Math.hypot(p.vx,p.vy)/20);const svx=p.vx-p.vy;if(Math.abs(svx)>24)p.face=Math.sign(svx)} /* sprite flip follows the on-screen x velocity (vx-vy), not raw world vx — moving straight up/down the screen must not flip the sprite */
@@ -4473,7 +4456,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
  zonesFx=zonesFx.filter(z=>z.t>0);
  // enemies
  for(const e of enemies){if(e.dead)continue;
-  if(e.redDeath){ /* v109: the Red Death only hunts — DoTs, hazards and attacks all skip it; it walks straight at the hero, a little faster every second, and its TOUCH ends the run outright: hurtPlayer is never consulted, so no shield charge, Phantom Guard or i-frame can intervene */
+  if(e.redDeath){ /* v109: the Red Death only hunts — DoTs and attacks all skip it; it walks straight at the hero, a little faster every second, and its TOUCH ends the run outright: hurtPlayer is never consulted, so no shield charge, Phantom Guard or i-frame can intervene */
    const rdx=p.x-e.x,rdy=p.y-e.y,rd=Math.hypot(rdx,rdy)||1,rsp=e.speed+Math.min(2.5,Math.max(0,elapsed-1800)*.02);e.x+=rdx/rd*rsp*60*dt;e.y+=rdy/rd*rsp*60*dt;e.animT+=dt*7;e._mv=true;
    if(rd<e.r+16){redDeathKill();return}
    continue}
@@ -4507,7 +4490,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
   if(e.poisonSlowT>0)slow*=.88; /* plague poison's minor slow */
   if(e.confuseT>0)slow=0; /* a confused foe stands and fights its own kind instead of advancing */
   const ranged=e.type==='Archer'||e.type==='Cultist'||(e.boss&&(e.bossKey==='veilmother'||e.bossKey==='prophet'));
-  let mv=e.speed*slow;const ehz=hazardAt(e.x,e.y);if(ehz&&ehz.kind==='ice')mv*=.6; /* ice patches slow the horde too */
+  let mv=e.speed*slow; /* v151: the hazard query + ice slow are deleted with the hazard system */
   if(e.type==='Beast'&&d>140&&d<320)mv=Math.min(mv*1.45,2.4); /* v116 MOVEMENT REWORK (VS basis): hero and horde share one unit space (speed x 60 = px/s). Hero base 2.05-2.65 (123-159 px/s); the slowest affinity-slowed hero (Pyromancer, -10% trade-off) is 1.845 = 110.7 px/s. v138 FULL PARITY: the v116 premise in this comment was WRONG — VS trash runs 91-145% of hero speed (wiki statboxes), NOT "well below the hero", so the old table tuned the horde to a VS that doesn't exist. Trash now sits at 94-138 px/s (Knight 94 = 0.85x the slowest hero, Spider 138 = 1.25x) and the Beast CHARGE is x1.45 hard-capped at 2.40 units = 144 px/s, so a charge CAN catch a hero — it is the closer now, not a punisher of standing still. (The brief's "1.3-1.8u" charge-cap figure would still sit below the slowest hero's 1.845u and could not catch anyone; 2.40u is the investigation's number and the one that satisfies the brief's stated intent.) */
   /* hurt knockback impulse + strike lunge velocity, both exponentially decayed — no allocation, safe at horde scale */
   if(e.kx||e.ky){e.x+=e.kx*dt;e.y+=e.ky*dt;const kd=Math.exp(-9*dt);e.kx*=kd;e.ky*=kd;if(Math.abs(e.kx)<2)e.kx=0;if(Math.abs(e.ky)<2)e.ky=0;if(e.chillT>0&&Math.hypot(e.kx,e.ky)>30&&Math.random()<dt*25)pixelBurst(e.x,e.y+12,2,'#d8f0ff')} /* v150 FROSTFIST: the slide frost trail — a chilled foe sliding on punch knockback sheds frost motes from its feet (~2 motes per ~0.05s while the slide is live; pixelBurst spawns 10px above the given point, so y+12 lands the motes at the feet) */
@@ -4551,7 +4534,7 @@ function update(dt){if(state!=='play')return;const p=player;elapsed+=dt;floorEla
     else if(bd.ab==='volley'){e.pendingVolley=.65;e.castT=.3;showToast('The Veilmother gathers the veil — VOLLEY incoming, keep moving!');ringFx(e.x,e.y,95,'#c9a2ff');sfx('bossab',{ab:bd.ab})} /* TELEGRAPH (P3 fix): the volley used to fire instantly — now a 0.65s gather with a ring and a warning first */
     else if(bd.ab==='charge'){e.pendingCharge=.8;showToast('Gormaw paws the ground — CHARGE incoming!');ringFx(e.x,e.y,85,'#ffb27a');sfx('bossab',{ab:bd.ab})} /* TELEGRAPH (P3 fix): the 540-speed lunge used to fire instantly — now a pawing wind-up first. v102: wind-up 0.55s -> 0.8s (F6 exposure fix) — a slower kit (Druid 2.35, Paladin 2.2) can now clear the charge lane on foot inside the telegraph instead of spending the dash every 3.8s cycle */}
    if(bossRef===e)ui('bossfill').style.width=clamp(e.hp/e.maxHp*100,0,100)+'%'}
-  if(ehz&&ehz.kind!=='ice'&&!e.boss){e.hp-=(ehz.kind==='lava'?20:ehz.kind==='void'?12:7)*dt;if(e.hp<=0){killEnemy(e);continue}} /* hazards hurt the horde as well (boss is immune) */
+  /* v151: the hazard damage tick on the horde (lava 20/s, void 12/s, poison 7/s, bosses immune) is deleted with the hazard system — hazard kills no longer feed XP/gems/drops */
   resolveEntity(e,ex0,ey0,Math.min(e.r||12,16)); /* no collision with the world — knockback carries foes as far as it carries them, and their loot lands where they fall, anywhere in the endless waste */
   e._mv=moving;
   /* stride clock follows actual movement speed (fast families cycle their
@@ -4730,7 +4713,7 @@ function draw(){
  if(player)lerpP(player);for(const e of enemies)lerpP(e);for(const a of allies)lerpP(a);for(const _lg of legionnaires)lerpP(_lg);for(const s of shots)lerpP(s);for(const s of eshots)lerpP(s);for(const g of gems)lerpP(g);for(const c of coins)lerpP(c);for(const h of hearts)lerpP(h);for(const zz of zonesFx)lerpP(zz);if(player&&player.cyclones)for(const _cy4 of player.cyclones)lerpP(_cy4);
  camRX=camera.px!==undefined?camera.px+(camera.x-camera.px)*renderAlpha:camera.x;camRY=camera.py!==undefined?camera.py+(camera.y-camera.py)*renderAlpha:camera.y;
  if(trauma>0){const _sm=trauma*trauma*9,_nt=performance.now()/1000;camRX+=Math.sin(_nt*9.3)*_sm;camRY+=Math.cos(_nt*7.7)*_sm*.72} /* trauma shake: offset scales with trauma squared — applied to the render camera only, never to gameplay positions. SMOOTHED: slow continuous oscillation (~1.5Hz) instead of the old ~18Hz jitter that made the whole scene vibrate */
- const z=ZONES[zoneIdx];drawWorld();
+ drawWorld(); /* v151: the dead const z=ZONES[zoneIdx] is deleted — drawWorld reads FLOOR itself */
  // ground loot & gems
  for(const g of gems){const s=screenPos(g.rx,g.ry);if(s.x<-40||s.x>W+40||s.y<-40||s.y>H+40)continue;if(g.magnet){ctx.globalAlpha=.55+.3*Math.sin(performance.now()/90);ctx.drawImage(glowImg('#b78bff'),s.x-16,s.y-22,32,32);ctx.globalAlpha=1}
  const _tier=g.pile?'pile':(g.tier||gemTierOf(g.value)),_im=gemImg(_tier),_gSeed=g.x*.13+g.y*.07,_gNow=performance.now(),_gBob=Math.sin(_gNow/300+_gSeed)*2,_gGlow=_tier==='pile'?'#ffd94a':_tier==='purple'?'#b44dff':_tier==='green'?'#37c24a':'#3a7bff',_gGs=_tier==='pile'?34:_tier==='purple'?30:_tier==='green'?26:22;
@@ -4852,10 +4835,15 @@ function draw(){
   const _tp2=Math.max(0,Math.min(1,t.t)),inner=t.r*(_tp2*_tp2*(3-2*_tp2));ctx.globalAlpha=.5+(t.t<.22?.3*Math.sin(performance.now()/28):0);ctx.beginPath();ctx.ellipse(s.x,s.y,inner*.72,inner*.36,0,0,7);ctx.stroke();ctx.globalAlpha=1} /* v84: the telegraph contraction is smoothstep-eased and the ring PULSES through the last fifth of a second before detonation — a warning gathering force, not a shrinking sticker */
  // depth-sorted props + entities
  const drawables=_drawables;drawables.length=0;
- for(const pr of props){const s=screenPos(pr.x,pr.y);if(s.x<-90||s.x>W+90||s.y<-120||s.y>H+90)continue;drawables.push({k:pr.x+pr.y,pr,s})}
+ for(const pr of props){const s=screenPos(pr.x,pr.y);if(s.x<-110||s.x>W+110||s.y<-120||s.y>H+220)continue;drawables.push({k:pr.x+pr.y,pr,s})}
  /* endless chunk dressing joins the same depth-sorted pass — the
-    starting clearing's props and the waste's props render identically */
- visibleChunks(camRX,camRY).forEach(ch=>{for(const pr of ch.props){const s=screenPos(pr.x,pr.y);if(s.x<-90||s.x>W+90||s.y<-120||s.y>H+90)continue;drawables.push({k:pr.x+pr.y,pr,s})}});
+    starting clearing's props and the waste's props render identically.
+    v151: the cull margins are widened for the tall landmarks (a 190px
+    chapel is ~206px tall, drawn UP from its base point — with the old
+    H+90 bottom margin its top would pop in late as it scrolled up
+    from below the screen). Top margin stays -120: a base above the
+    screen means the whole sprite is above the screen. */
+ visibleChunks(camRX,camRY).forEach(ch=>{for(const pr of ch.props){const s=screenPos(pr.x,pr.y);if(s.x<-110||s.x>W+110||s.y<-120||s.y>H+220)continue;drawables.push({k:pr.x+pr.y,pr,s})}});
  if(player)drawables.push({k:player.rx+player.ry,hero:true});
  for(const e of enemies)drawables.push({k:e.rx+e.ry,e});
  for(const c of corpses)drawables.push({k:c.x+c.y,corpse:c});
@@ -4868,7 +4856,7 @@ function draw(){
  for(const d of drawables){
   if(d.corpse){drawCorpse(d.corpse);continue}
   if(d.pr){const gimgs=propImages(d.pr.type);const gim=gimgs.length?gimgs[d.pr.v%gimgs.length]:null;
-   if(gim&&gim.complete&&gim.naturalWidth){const pw=d.pr.type==='tree'?86:64,ph=pw*gim.naturalHeight/gim.naturalWidth;ctx.save();ctx.translate(d.s.x,d.s.y+6);if(d.pr.v%2)ctx.scale(-1,1);ctx.drawImage(gim,-pw/2,-ph,pw,ph);ctx.restore()}
+   if(gim&&gim.complete&&gim.naturalWidth){const pw=propWidth(d.pr.type),ph=pw*gim.naturalHeight/gim.naturalWidth;ctx.save();ctx.translate(d.s.x,d.s.y+6);if(d.pr.v%2)ctx.scale(-1,1);ctx.drawImage(gim,-pw/2,-ph,pw,ph);ctx.restore()} /* v151: per-type landmark widths via the shared propWidth() rule (chapel 190 / stones 170 / tree 110 / obelisk 64) */
    else{const im=propCanvas(d.pr.type,d.pr.v);ctx.drawImage(im,d.s.x-28,d.s.y-64)}
    if(d.pr.type==='lava'){ctx.globalAlpha=.55;ctx.drawImage(glowImg('#ff6a2a'),d.s.x-52,d.s.y-60,104,104);ctx.globalAlpha=1}
    continue}
@@ -5197,8 +5185,8 @@ function aiTick(dt){
    else{mx=Math.cos(elapsed*.4);my=Math.sin(elapsed*.4);act='Patrolling for the next wave'}
    const l=Math.hypot(mx,my)||1;aiVec={x:mx/l,y:my/l};setAiStatus(act);
    /* stuck failsafe: nothing blocks movement now, but if the pilot
-      ever barely moves while trying to (a crush of bodies, a hazard
-      shove), it detours sideways instead of pushing forever */
+      ever barely moves while trying to (a crush of bodies),
+      it detours sideways instead of pushing forever */
    if(aiLastPX!==undefined){const moved=Math.hypot(p.x-aiLastPX,p.y-aiLastPY);if(moved<3&&(mx||my))aiStuckT+=.18;else aiStuckT=0;if(aiStuckT>.55){aiStuckT=0;aiVec={x:-aiVec.y,y:aiVec.x};setAiStatus('Barely moved — detouring around the blockage')}}
    aiLastPX=p.x;aiLastPY=p.y;
    /* no skill brain needed: skills auto-cast on cooldown inside update(),
@@ -5435,8 +5423,8 @@ function pxPoiTile(name,wx,wy,halfW){const c=tsPoiCanvas(name);if(!c)return;cons
  const sp=PX.pPoi.get();pxPlace(sp,tex,s.x-halfW,s.y-hh,halfW*2,hh*2,{})}
 function pxFloor(){
  const step=72,_qx=Math.floor(camRX/step)*step,_qy=Math.floor(camRY/step)*step;
- const _tilesReady=['stone','bones','pentagram','moss','dirt','blood','ice','lava','court','carpet','compass','grate'].every(nm=>{const im=tsTex(nm);return im.complete&&im.naturalWidth});
- const _fkey=_qx+','+_qy+','+zoneIdx+','+W+'x'+H;
+ const _tilesReady=['moor_stone','moor_worn','moor_dirt','moor_moss','moor_bones','moor_rubble','moor_ash','moor_rune','court','pentagram','compass','grate'].every(nm=>{const im=tsTex(nm);return im.complete&&im.naturalWidth}); /* v151: MUST stay in sync with the preload list + the Canvas list (audit R9) */
+ const _fkey=_qx+','+_qy+','+W+'x'+H; /* v151: the zoneIdx key segment is deleted — camera cell + viewport only */
  if(_fkey!==FLOOR_KEY){FLOOR_CAMX=_qx;FLOOR_CAMY=_qy;renderFloorLayer();FLOOR_KEY=_tilesReady?_fkey:'__loading';PXFLOORDIRTY=true}
  if(FLOOR_LAYER){if(!PX.floorTex)PX.floorTex=pxTex(FLOOR_LAYER);
   if(PX.floorTex){if(PXFLOORDIRTY){try{PX.floorTex.source.update()}catch(e){}PXFLOORDIRTY=false}
@@ -5447,14 +5435,10 @@ function pxFloor(){
  if(poi.shrine&&!poi.shrine.used)pxPoiTile('compass',poi.shrine.x,poi.shrine.y,165);
  if(poi.secret&&poi.secret.found)pxPoiTile('grate',poi.secret.x,poi.secret.y,165);
  (poi.shrines||[]).forEach(sh=>{if(!sh.used)pxPoiTile('compass',sh.x,sh.y,150)})}
-/* ---- ground pass: hazards, rubble, gems, magnets, chests, shrines,
+/* ---- ground pass: rubble, gems, magnets, chests, shrines,
    boss marker, drops, decals, Whirlwind / Holy Fire ground reads ---- */
 function pxGround(z){const g=PX.gGround,now=performance.now();
- const _hzDraw=hazards.slice();visibleChunks(camRX,camRY).forEach(ch=>{for(const hz of ch.hazards)_hzDraw.push(hz)});
- for(const hz of _hzDraw){const s=screenPos(hz.x,hz.y);if(s.x<-100||s.x>W+100||s.y<-80||s.y>H+80)continue;
-  pxEll(g,s.x,s.y,hz.r*.72,hz.r*.36,hz.kind==='lava'?'#ff6a2a':hz.kind==='ice'?'#9fc6e8':hz.kind==='void'?'#9a6ad9':'#6ec85a',hz.kind==='lava'?.5:hz.kind==='ice'?.38:hz.kind==='void'?.4:.32);
-  if(hz.kind==='ice')pxEllS(g,s.x,s.y,hz.r*.72,hz.r*.36,1,'#dcf0ff',.35);
-  if(hz.kind==='lava')pxGlow(PX.pGround,s.x,s.y,92,'#ff6a2a',.45+.2*Math.sin(now/300+hz.x),false)}
+ /* v151: the hazard ground pass is DELETED with the hazard system */
  /* flat rubble dressing — same world-hash scatter as the Canvas pass */
  const cell=180,gx0=Math.floor((camRX-1500)/cell),gx1=Math.ceil((camRX+1500)/cell),gy0=Math.floor((camRY-1500)/cell),gy1=Math.ceil((camRY+1500)/cell);
  for(let gy=gy0;gy<=gy1;gy++)for(let gx=gx0;gx<=gx1;gx++){
@@ -5562,11 +5546,13 @@ function pxTeles(){const g=PX.gTele,_cn=performance.now()/1000;
   pxEllS(g,s.x,s.y,inner*.72,inner*.36,1.5,col,.5+(t.t<.22?.3*Math.sin(performance.now()/28):0))}}
 /* ---- (b) depth-sorted entities: props, hero, allies, enemies,
    corpses — sorted by (x+y) exactly like the Canvas pass (Pixi has
-   no automatic y-sort, so zIndex carries the rank). ---- */
+   no automatic y-sort, so zIndex carries the rank). v151: the prop
+   cull margins match the Canvas pass (widened for the tall
+   landmarks — see the note there). ---- */
 function pxEntities(){const gU=PX.gUnder,gO=PX.gOver;
  const drawables=_drawables;drawables.length=0;
- for(const pr of props){const s=screenPos(pr.x,pr.y);if(s.x<-90||s.x>W+90||s.y<-120||s.y>H+90)continue;drawables.push({k:pr.x+pr.y,pr,s})}
- visibleChunks(camRX,camRY).forEach(ch=>{for(const pr of ch.props){const s=screenPos(pr.x,pr.y);if(s.x<-90||s.x>W+90||s.y<-120||s.y>H+90)continue;drawables.push({k:pr.x+pr.y,pr,s})}});
+ for(const pr of props){const s=screenPos(pr.x,pr.y);if(s.x<-110||s.x>W+110||s.y<-120||s.y>H+220)continue;drawables.push({k:pr.x+pr.y,pr,s})}
+ visibleChunks(camRX,camRY).forEach(ch=>{for(const pr of ch.props){const s=screenPos(pr.x,pr.y);if(s.x<-110||s.x>W+110||s.y<-120||s.y>H+220)continue;drawables.push({k:pr.x+pr.y,pr,s})}});
  if(player)drawables.push({k:player.rx+player.ry,hero:true});
  for(const e of enemies)drawables.push({k:e.rx+e.ry,e});
  for(const c of corpses)drawables.push({k:c.x+c.y,corpse:c});
@@ -5580,7 +5566,7 @@ function pxEntities(){const gU=PX.gUnder,gO=PX.gOver;
  for(const d of drawables){rank++;const z=rank;
   if(d.corpse){pxDrawCorpse(d.corpse,z);continue}
   if(d.pr){const gimgs=propImages(d.pr.type);const gim=gimgs.length?gimgs[d.pr.v%gimgs.length]:null;
-   if(gim&&gim.complete&&gim.naturalWidth){const tex=pxTex(gim);if(tex){const pw=d.pr.type==='tree'?86:64,ph=pw*gim.naturalHeight/gim.naturalWidth,sp=PX.pEnt.get();pxPlace(sp,tex,d.s.x-pw/2,d.s.y+6-ph,pw,ph,{flip:d.pr.v%2===1});sp.zIndex=z}}
+   if(gim&&gim.complete&&gim.naturalWidth){const tex=pxTex(gim);if(tex){const pw=propWidth(d.pr.type),ph=pw*gim.naturalHeight/gim.naturalWidth,sp=PX.pEnt.get();pxPlace(sp,tex,d.s.x-pw/2,d.s.y+6-ph,pw,ph,{flip:d.pr.v%2===1});sp.zIndex=z}} /* v151: per-type landmark widths via the shared propWidth() rule (chapel 190 / stones 170 / tree 110 / obelisk 64) */
    else{const im=propCanvas(d.pr.type,d.pr.v),tex=pxTex(im);if(tex){const sp=PX.pEnt.get();pxPlace(sp,tex,d.s.x-28,d.s.y-64,56,84,{});sp.zIndex=z}}
    if(d.pr.type==='lava'){const sp=PX.pEnt.get();const tex=pxTex(glowImg('#ff6a2a'));if(tex){pxPlace(sp,tex,d.s.x-52,d.s.y-60,104,104,{alpha:.55});sp.zIndex=z+.3}}
    continue}
@@ -5860,7 +5846,7 @@ function pxDraw(){const L=PX;
  if(player)lerpP(player);for(const e of enemies)lerpP(e);for(const a of allies)lerpP(a);for(const _lg of legionnaires)lerpP(_lg);for(const s of shots)lerpP(s);for(const s of eshots)lerpP(s);for(const g of gems)lerpP(g);for(const c of coins)lerpP(c);for(const h of hearts)lerpP(h);for(const zz of zonesFx)lerpP(zz);if(player&&player.cyclones)for(const _cy4 of player.cyclones)lerpP(_cy4);
  camRX=camera.px!==undefined?camera.px+(camera.x-camera.px)*renderAlpha:camera.x;camRY=camera.py!==undefined?camera.py+(camera.y-camera.py)*renderAlpha:camera.y;
  if(trauma>0){const _sm=trauma*trauma*9,_nt=performance.now()/1000;camRX+=Math.sin(_nt*9.3)*_sm;camRY+=Math.cos(_nt*7.7)*_sm*.72}
- const z=ZONES[zoneIdx];
+ const z=FLOOR; /* v151: the single floor's bg fills the Pixi frame */
  L.pPoi.begin();L.pGround.begin();L.pEnt.begin();L.pShots.begin();L.pParts.begin();L.pFire.begin();L.pTxt.begin();L.pWhirl.begin();
  L.bg.clear();pxRect(L.bg,0,0,W,H,z.bg,1);
  pxFloor();
